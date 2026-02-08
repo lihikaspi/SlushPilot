@@ -3,3 +3,11 @@ python-dotenv
 uvicorn
 fastapi
 pinecone
+pydantic
+langchain
+langchain-openai
+langchain-pinecone
+langchain-community
+langchain-core
+langchain-text-splitters
+langchain-classic

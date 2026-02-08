@@ -11,3 +11,5 @@ DB_API_KEY = os.getenv("DB_API_KEY")
 BASE_URL = "https://api.llmod.ai/v1"
 CHAT_MODEL = "RPRTHPB-gpt-5-mini"
 EMBED_MODEL = "RPRTHPB-text-embedding-3-small"
+
+ARCHITECTURE_IMAGE = "images/SlushPilot.png"
