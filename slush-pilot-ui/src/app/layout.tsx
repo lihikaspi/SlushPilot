@@ -12,7 +12,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const isLoginPage = pathname === "/login";
+  const isLoginPage = pathname === "/";
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const supabase = createClient();
 
