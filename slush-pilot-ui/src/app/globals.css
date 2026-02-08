@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@theme {
+  /* Defining our book-ish color palette for easy use later */
+  --color-parchment: #f4f1ea;
+  --color-ink: #1a1a1a;
+  --color-manuscript-gray: #5c5c5c;
+  --color-binding-gold: #dcd6bc;
+}
+
+:root {
+  --background: #f4f1ea;
+  --foreground: #1a1a1a;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  /* Ensuring a serif font is the default for that library feel */
+  font-family: 'Georgia', 'Times New Roman', Times, serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar to match the parchment vibe */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f4f1ea;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #dcd6bc;
+  border-radius: 0px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #c5be9e;
+}
