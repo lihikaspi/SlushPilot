@@ -1,37 +1,47 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+// Using the client utility to interact with Supabase
 import { createClient } from '../../utils/supabase/client';
 
 export default function AccountPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // State matching the public.profiles table fields
   const [profile, setProfile] = useState({
+    username: '',
     full_name: '',
+    phone: '',
+    email: '',
     city: '',
     country: '',
-    bio: '',
-    phone: ''
+    bio: ''
   });
 
   useEffect(() => {
     async function loadProfile() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
+      // Retrieve the session username from local storage
+      const storedUsername = localStorage.getItem('slushpilot_user');
+
+      if (storedUsername) {
+        // Fetch the user's profile data from the profiles table
+        const { data, error } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', user.id)
+          .eq('username', storedUsername)
           .single();
 
-        if (data) {
+        if (data && !error) {
           setProfile({
+            username: data.username || '',
             full_name: data.full_name || '',
+            phone: data.phone || '',
+            email: data.email || '',
             city: data.city || '',
             country: data.country || '',
-            bio: data.bio || '',
-            phone: data.phone || ''
+            bio: data.bio || ''
           });
         }
       }
@@ -43,15 +53,25 @@ export default function AccountPage() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
 
+    // Update the record in the profiles table based on the username
     const { error } = await supabase
       .from('profiles')
-      .upsert({ id: user.id, ...profile, updated_at: new Date().toISOString() });
+      .update({
+        full_name: profile.full_name,
+        phone: profile.phone,
+        email: profile.email,
+        city: profile.city,
+        country: profile.country,
+        bio: profile.bio
+      })
+      .eq('username', profile.username);
 
-    if (error) alert('Error saving biography.');
-    else alert('Biography updated.');
+    if (error) {
+      alert('Error saving biography: ' + error.message);
+    } else {
+      alert('Biography updated successfully.');
+    }
     setSaving(false);
   };
 
@@ -65,49 +85,75 @@ export default function AccountPage() {
       </header>
 
       <form onSubmit={handleUpdate} className="bg-white border border-[#dcd6bc] shadow-sm p-10 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Legal Name / Nom de Plume</label>
-              <input
-                type="text"
-                value={profile.full_name}
-                onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">City</label>
-              <input
-                type="text"
-                value={profile.city}
-                onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-                className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
-              />
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+
+          {/* Row 1: Full Name and Username */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Legal Name / Nom de Plume *</label>
+            <input
+              type="text"
+              value={profile.full_name}
+              onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+              className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
+              required
+            />
           </div>
-          <div className="space-y-6">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Contact Number</label>
-              <input
-                type="text"
-                value={profile.phone}
-                onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Country</label>
-              <input
-                type="text"
-                value={profile.country}
-                onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
-              />
-            </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Username (Scribe Handle)</label>
+            <input
+              type="text"
+              value={profile.username}
+              disabled
+              className="w-full px-4 py-2 border-b border-[#eee] outline-none bg-[#f9f9f9] font-serif text-[#999] cursor-not-allowed"
+            />
+          </div>
+
+          {/* Row 2: Phone and Email */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Phone Number</label>
+            <input
+              type="text"
+              value={profile.phone}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
+              placeholder="+1 (555) 000-0000"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Email Address</label>
+            <input
+              type="email"
+              value={profile.email}
+              onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+              className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
+              placeholder="author@inkwell.com"
+            />
+          </div>
+
+          {/* Row 3: City and Country */}
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">City</label>
+            <input
+              type="text"
+              value={profile.city}
+              onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+              className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
+              placeholder="London"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Country</label>
+            <input
+              type="text"
+              value={profile.country}
+              onChange={(e) => setProfile({ ...profile, country: e.target.value })}
+              className="w-full px-4 py-2 border-b border-[#eee] focus:border-[#1a1a1a] outline-none bg-transparent font-serif"
+              placeholder="United Kingdom"
+            />
           </div>
         </div>
 
+        {/* Bio Section */}
         <div>
           <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Author Background</label>
           <textarea
@@ -123,9 +169,9 @@ export default function AccountPage() {
           <button
             type="submit"
             disabled={saving}
-            className="px-10 py-3 bg-[#1a1a1a] text-white font-bold uppercase tracking-widest text-xs hover:bg-[#333] shadow-lg disabled:opacity-50"
+            className="px-10 py-3 bg-[#1a1a1a] text-white font-bold uppercase tracking-widest text-xs hover:bg-[#333] shadow-lg disabled:opacity-50 cursor-pointer"
           >
-            {saving ? 'Updating...' : 'Update Record'}
+            {saving ? 'Inking parchment...' : 'Update Biography'}
           </button>
         </div>
       </form>
