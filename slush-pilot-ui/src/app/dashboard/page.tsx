@@ -119,7 +119,7 @@ export default function DashboardPage() {
           <h1 className="text-4xl font-bold text-[#1a1a1a] mb-2 tracking-tight">Your Slush Pile</h1>
           <p className="text-[#5c5c5c] italic text-lg font-serif">"Every great work begins with a single pitch."</p>
         </div>
-        <button onClick={createNewProject} className="bg-[#1a1a1a] text-white px-6 py-3 font-bold uppercase tracking-widest text-xs hover:bg-[#333] transition-all cursor-pointer shadow-sm">
+        <button onClick={createNewProject} className="bg-[#1a1a1a] text-white px-6 py-3 font-sans font-bold uppercase tracking-widest text-xs hover:bg-[#333] transition-all cursor-pointer shadow-sm">
           New Manuscript
         </button>
       </header>
@@ -140,16 +140,16 @@ export default function DashboardPage() {
                 <div className="absolute top-2 right-2 z-20">
                   <button
                     onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === project.id ? null : project.id); }}
-                    className="p-1 hover:bg-black/5 rounded-full transition-colors cursor-pointer text-black/20 hover:text-black/60"
+                    className="p-1 hover:bg-black/5 rounded-full transition-colors cursor-pointer text-black/20 hover:text-black/60 font-sans"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                   </button>
 
                   {activeMenu === project.id && (
-                    <div ref={menuRef} className="absolute left-full top-0 ml-1 w-32 bg-white border border-[#dcd6bc] shadow-xl z-30 py-1">
-                      {/* Requirement 4 & 5: Different font (Sans) and normal casing for menu */}
-                      <button onClick={() => openRenameModal(project)} className="w-full text-left px-4 py-2 text-[11px] font-sans font-semibold tracking-normal hover:bg-[#f9f8f4] text-[#1a1a1a] cursor-pointer">Rename</button>
-                      <button onClick={() => openDeleteModal(project)} className="w-full text-left px-4 py-2 text-[11px] font-sans font-semibold tracking-normal hover:bg-red-50 text-red-600 cursor-pointer">Delete</button>
+                    <div ref={menuRef} className="absolute left-full top-0 ml-1 w-36 bg-white border border-[#dcd6bc] shadow-xl z-30 py-1">
+                      {/* Increased Font Size for Menu Options */}
+                      <button onClick={() => openRenameModal(project)} className="w-full text-left px-4 py-2 text-xs font-sans font-semibold tracking-normal hover:bg-[#f9f8f4] text-[#1a1a1a] cursor-pointer">Rename</button>
+                      <button onClick={() => openDeleteModal(project)} className="w-full text-left px-4 py-2 text-xs font-sans font-semibold tracking-normal hover:bg-red-50 text-red-600 cursor-pointer">Delete</button>
                     </div>
                   )}
                 </div>
@@ -166,10 +166,10 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              <div className="flex-1 ml-4 flex flex-col justify-center py-2 relative">
+              {/* DETAILS COLUMN: matched to height of book (h-56) to align date at bottom */}
+              <div className="flex-1 ml-4 h-56 flex flex-col py-2 relative">
                 <div className="mb-3">
-                  {/* Requirement 2: Status block fits text (w-fit) */}
-                  <span className={`${statusInfo.colorClass} text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-sm shadow-sm inline-block w-fit whitespace-normal leading-normal`}>
+                  <span className={`${statusInfo.colorClass} text-white text-[10px] font-sans font-bold uppercase tracking-widest px-3 py-1 rounded-sm shadow-sm inline-block w-fit whitespace-normal leading-normal`}>
                     {statusInfo.label}
                   </span>
                 </div>
@@ -181,20 +181,20 @@ export default function DashboardPage() {
                     return (
                       <div key={key} className="flex items-center space-x-1.5">
                         <span className={`w-1.5 h-1.5 rounded-full ${LETTER_STATUS[key].colorClass}`}></span>
-                        {/* Requirement 3: Letter count normal casing */}
-                        <span className="text-[9px] font-semibold text-[#555] tracking-normal capitalize">
+                        {/* Increased Font Size for Letter Count */}
+                        <span className="text-[11px] font-sans font-semibold text-[#555] tracking-normal capitalize">
                           {count} {LETTER_STATUS[key].label}
                         </span>
                       </div>
                     );
                   })}
                   {(project.query_letters || []).length === 0 && (
-                     <div className="text-[9px] font-semibold text-[#666]">No letters found</div>
+                     <div className="text-[11px] font-sans font-semibold text-[#666]">No letters found</div>
                   )}
                 </div>
 
-                {/* Requirement 1: Date not bold, lighter than letter count (#666 vs #555) */}
-                <div className="text-[11px] text-[#666] font-normal font-serif border-t border-[#eee] pt-1.5">
+                {/* UPDATE DATE: Pinned to bottom using mt-auto */}
+                <div className="mt-auto text-[11px] text-[#666] font-normal font-sans border-t border-[#eee] pt-1.5">
                   {formatDate(project.updated_at)}
                 </div>
               </div>
@@ -203,26 +203,25 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* Modals Logic ... */}
       {modalType && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-[2px] z-50 flex items-center justify-center p-4">
           <div className="bg-[#fdfcf9] border border-[#dcd6bc] w-full max-w-md shadow-2xl p-8 rounded-sm animate-in fade-in zoom-in duration-200">
             {modalType === 'rename' ? (
               <>
-                <h2 className="text-xs font-bold uppercase tracking-widest text-[#999] mb-6">Rename Manuscript</h2>
+                <h2 className="text-xs font-sans font-bold uppercase tracking-widest text-[#999] mb-6">Rename Manuscript</h2>
                 <input type="text" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="w-full bg-white border border-[#dcd6bc] p-3 font-serif text-sm outline-none focus:border-[#1a1a1a] mb-8" placeholder="New Title..." autoFocus />
                 <div className="flex space-x-4">
-                  <button onClick={confirmRename} className="flex-1 bg-[#1a1a1a] text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#333] cursor-pointer">Update Title</button>
-                  <button onClick={closeModal} className="flex-1 border border-[#dcd6bc] text-[#666] py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#f9f8f4] cursor-pointer">Cancel</button>
+                  <button onClick={confirmRename} className="flex-1 bg-[#1a1a1a] text-white py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#333] cursor-pointer">Update Title</button>
+                  <button onClick={closeModal} className="flex-1 border border-[#dcd6bc] text-[#666] py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#f9f8f4] cursor-pointer">Cancel</button>
                 </div>
               </>
             ) : (
               <>
-                <h2 className="text-xs font-bold uppercase tracking-widest text-red-600 mb-6">Confirm Deletion</h2>
+                <h2 className="text-xs font-sans font-bold uppercase tracking-widest text-red-600 mb-6">Confirm Deletion</h2>
                 <p className="font-serif italic text-[#1a1a1a] mb-8">This action cannot be undone. Are you sure you want to delete this project?</p>
                 <div className="flex space-x-4">
-                  <button onClick={confirmDelete} className="flex-1 bg-red-600 text-white py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 cursor-pointer">Yes, Delete</button>
-                  <button onClick={closeModal} className="flex-1 border border-[#dcd6bc] text-[#666] py-3 text-[10px] font-bold uppercase tracking-widest hover:bg-[#f9f8f4] cursor-pointer">Cancel</button>
+                  <button onClick={confirmDelete} className="flex-1 bg-red-600 text-white py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-red-700 cursor-pointer">Yes, Delete</button>
+                  <button onClick={closeModal} className="flex-1 border border-[#dcd6bc] text-[#666] py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#f9f8f4] cursor-pointer">Cancel</button>
                 </div>
               </>
             )}
