@@ -1,0 +1,17 @@
+Dear [agent],
+
+I was so pleased to see cozy fantasy on your wish list, and I'm thrilled to throw my hat into the ring with my adult cozy fantasy, VIOLET THISTLETHWAITE IS NOT A VILLAIN ANYMORE.
+
+After the evil sorcerer that Violet has served her entire life is vanquished, all she wants is a chance to start over and set down some roots that sprout peonies instead of poisons for once. She settles in the town of Dragon's Rest, where she hopes to open a flower shop, keep her sentient (and mildly homicidal) pet houseplant out of trouble, and cold-turkey quit the use of dark magic after a lifetime of villainy. Simple, right?
+
+Violet's vibrant bouquets and feats of plant magic soon charm the welcoming townsfolk, although nothing she does seems to impress Nathaniel Marsh, the prickly-yet-handsome alchemist who shares her greenhouse and is desperately seeking a second chance of his own.
+
+But just as Violet starts to think she's pruned away all the thorns of her nefarious former life, a mysterious blight threatens her new home. Violet and Nathaniel must work together through their fears, their pasts, and their growing feelings for one another to save their community. And when a figure from Violet's past comes knocking on her door, threatening to expose her secret and destroy everything she's built, Violet is forced to face whether a villain like her ever truly deserves to grow her own happily ever after.
+
+VIOLET THISTLETHWAITE IS NOT A VILLAIN ANYMORE is an 80,000-word cozy fantasy romance about second chances, found family, and redemption. Bursting with cottagecore garden imagery, compelling stakes, big emotions, and spice (and I'm not talking the spices you grow in a garden), VIOLET THISTLETHWAITE is perfect for adult readers who loved the warm community of LEGENDS & LATTES, the sweet-and-spicy romance of THE UNDERTAKING OF HART AND MERCY, and the immersive lore of EMILY WILDE'S ENCYCLOPEDIA OF FAERIES. Given its initial success as well as the growing need for gentle escapism, cozy fantasy as a genre is here to stay. By fusing it with the rabid romance reader base and the powerful zeitgeist that is Booktok, VIOLET THISTLETHWAITE is well poised to bloom in an even larger market.
+
+I'm a bestselling ghostwriter, editor, and award-winning book coach who has worked with hundreds of authors as they write, edit, and publish their books. I've worked on projects that have sold for six figures to Big 5 publishers and been featured on the USA Today, Publisher's Weekly, Wall Street Journal, and LA Times best sellers lists. Outside of my day job, I teach about writing and decorate bookish cakes to my social media following of 8K across platforms. I live in beautiful Denver, CO, and spend as much time hiking and traveling as possible--I find it's much easier to pretend I'm a character in a book that way.
+
+Thank you for your consideration,
+
+Emily Krempholtz
