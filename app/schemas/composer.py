@@ -16,14 +16,15 @@ class Manuscript(BaseModel):
 
 class Publisher(BaseModel):
     name: str
-    agent_name: Optional[str] = None
     imprints: Optional[List[str]] = None
     fit_notes: Optional[str] = None
+    special_criteria: Optional[str] = None
 
 
 class ComposerOptions(BaseModel):
     tone: str = "professional"
     format: str = "classic_query_letter"
+    paraphrase_summary: bool = True
 
 
 class ComposerRequest(BaseModel):
@@ -34,7 +35,6 @@ class ComposerRequest(BaseModel):
 
 class LetterResult(BaseModel):
     publisher: str
-    agent_name: Optional[str] = None
     letter: str
     status: str = "ok"
     warnings: List[str] = Field(default_factory=list)

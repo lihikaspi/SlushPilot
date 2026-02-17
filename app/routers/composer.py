@@ -27,8 +27,6 @@ async def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
         warnings = []
         if not payload.manuscript.comps:
             warnings.append("comps_missing")
-        if not publisher.agent_name:
-            warnings.append("agent_name_missing")
         if not publisher.fit_notes and not payload.manuscript.personalization_notes:
             warnings.append("personalization_missing")
 
@@ -39,11 +37,15 @@ async def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
                 options=payload.options,
                 examples=examples,
             )
-            letter = generate_query_letter(messages)
+            letter = generate_query_letter(
+                messages,
+                manuscript=payload.manuscript,
+                publisher=publisher,
+                options=payload.options,
+            )
             results.append(
                 LetterResult(
                     publisher=publisher.name,
-                    agent_name=publisher.agent_name,
                     letter=letter,
                     warnings=warnings,
                 )
@@ -53,7 +55,6 @@ async def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
             results.append(
                 LetterResult(
                     publisher=publisher.name,
-                    agent_name=publisher.agent_name,
                     letter="",
                     status="error",
                     warnings=warnings,
