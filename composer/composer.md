@@ -13,7 +13,6 @@ Backend service for generating query letters from a manuscript and a list of pub
     "word_count": 80000,
     "genre": "Adult Cozy Fantasy Romance",
     "summary": "1-2 paragraph synopsis...",
-    "comps": ["Legends & Lattes", "The Undertaking of Hart and Mercy"],
     "author_bio": "Short, relevant bio...",
     "author_name": "Author Name",
     "personalization_notes": "Optional extra context"
@@ -22,12 +21,11 @@ Backend service for generating query letters from a manuscript and a list of pub
     {
       "name": "Publisher Name",
       "imprints": ["Imprint A", "Imprint B"],
-      "fit_notes": "Why this publisher is a fit",
+      "comps": ["Comp Title 1", "Comp Title 2"],
       "special_criteria": "Biggest publisher"
     }
   ],
   "options": {
-    "tone": "professional",
     "format": "classic_query_letter",
     "paraphrase_summary": true
   }
@@ -51,8 +49,8 @@ Backend service for generating query letters from a manuscript and a list of pub
 
 ### Notes
 - Required manuscript fields: `title`, `word_count`, `genre`, `summary`, `author_name`.
-- Optional manuscript fields: `comps`, `author_bio`, `personalization_notes`.
-- Optional publisher fields: `imprints`, `fit_notes`, `special_criteria`.
+- Optional manuscript fields: `author_bio`, `personalization_notes`.
+- Optional publisher fields: `imprints`, `comps`, `special_criteria`.
 - Optional options fields: `paraphrase_summary` (default true).
 - Few-shot examples load from `composer/letters/*/modified`.
 - Output is generated via **schema → template render** for format control.

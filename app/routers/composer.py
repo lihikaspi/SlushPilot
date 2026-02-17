@@ -25,9 +25,9 @@ async def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
 
     for publisher in payload.publishers:
         warnings = []
-        if not payload.manuscript.comps:
+        if not publisher.comps:
             warnings.append("comps_missing")
-        if not publisher.fit_notes and not payload.manuscript.personalization_notes:
+        if not payload.manuscript.personalization_notes and not publisher.special_criteria:
             warnings.append("personalization_missing")
 
         try:

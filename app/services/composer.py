@@ -12,11 +12,25 @@ from app.schemas.composer import ComposerOptions, Manuscript, Publisher
 
 
 class QueryLetterSections(BaseModel):
+    tone: str = Field(
+        ...,
+        description=(
+            "Chosen tone for the letter. Select one of: professional, warm_professional, "
+            "literary_professional, tense_professional."
+        ),
+    )
     personalization_reason: str = Field(
         ...,
         description=(
             "Why this publisher is a fit. Phrase as a clause that can follow "
             "'I am querying you because ...' without adding a leading period."
+        ),
+    )
+    fit_compatible: bool = Field(
+        ...,
+        description=(
+            "True if the publisher's strengths align with the manuscript's genre "
+            "and audience; false if they conflict."
         ),
     )
     summary_paragraphs: List[str] = Field(
@@ -60,10 +74,10 @@ def build_composer_prompt(
         "described in the user message. Do not include markdown, commentary, or extra keys."
     )
 
-    personalization = publisher.fit_notes or manuscript.personalization_notes or ""
+    personalization = manuscript.personalization_notes or ""
     criteria = publisher.special_criteria or ""
-    comps = ", ".join(manuscript.comps) if manuscript.comps else "None provided"
     imprints = ", ".join(publisher.imprints) if publisher.imprints else "None"
+    comps = ", ".join(publisher.comps) if publisher.comps else "None provided"
 
     example_block = "\n\n".join(
         f"Example {idx + 1}:\n{example}" for idx, example in enumerate(examples)
@@ -75,16 +89,17 @@ def build_composer_prompt(
         "Do NOT copy their structure into any field. Output JSON only.\n\n"
         "Schema:\n"
         "{\n"
+        '  "tone": "professional",\n'
         '  "personalization_reason": "string",\n'
+        '  "fit_compatible": true,\n'
         '  "summary_paragraphs": ["string", "..."],\n'
         '  "bio": "string",\n'
         '  "signoff": "Sincerely"\n'
         "}\n\n"
         f"Publisher name: {publisher.name}\n"
         f"Imprints: {imprints}\n"
-        f"Fit notes: {personalization}\n"
+        f"Personalization notes: {personalization or 'None provided'}\n"
         f"Publisher strength criteria: {criteria or 'None provided'}\n"
-        f"Tone: {options.tone}\n"
         f"Format: {options.format}\n\n"
         "Manuscript:\n"
         f"- Title: {manuscript.title}\n"
@@ -104,10 +119,14 @@ def build_composer_prompt(
         )
     user_text += (
         "\nConstraints:\n"
+        "- tone: choose one of professional, warm_professional, literary_professional, "
+        "tense_professional based on the manuscript and publisher.\n"
         "- personalization_reason: clause only (no leading 'I am querying you because').\n"
+        "- fit_compatible: set to false if criteria conflict with the manuscript genre.\n"
         "- summary_paragraphs: story summary only; do not include title/word count/genre, "
         "comps, bio, or closing.\n"
         "- bio: 1-2 factual sentences.\n"
+        "- Use the chosen tone when writing summary and bio.\n"
     )
 
     return [SystemMessage(content=system_text), HumanMessage(content=user_text)]
@@ -121,6 +140,7 @@ def _normalize_clause(text: str) -> str:
         cleaned,
         flags=re.IGNORECASE,
     ).strip()
+    cleaned = re.sub(r"^[\W_]+", "", cleaned)
     if cleaned.endswith("."):
         cleaned = cleaned[:-1].strip()
     return cleaned
@@ -157,11 +177,67 @@ def _sanitize_bio(bio: str, author_name: str) -> str:
 
 
 def _fallback_personalization(publisher: Publisher) -> str:
-    if publisher.fit_notes:
-        return publisher.fit_notes.strip()
     if publisher.special_criteria:
         return publisher.special_criteria.strip()
     return "your publishing interests align with my manuscript"
+
+
+def _format_word_count(word_count: int) -> str:
+    return f"{word_count:,}"
+
+
+def _join_comps(comps: List[str]) -> str:
+    if not comps:
+        return ""
+    if len(comps) == 1:
+        return comps[0]
+    if len(comps) == 2:
+        return f"{comps[0]} and {comps[1]}"
+    return f"{', '.join(comps[:-1])}, and {comps[-1]}"
+
+
+def _sanitize_comps(comps: List[str]) -> List[str]:
+    cleaned = []
+    for comp in comps:
+        value = comp.strip()
+        if not value:
+            continue
+        cleaned.append(value)
+    if len(cleaned) > 3:
+        cleaned = cleaned[:3]
+    return cleaned
+
+
+def _make_clause(text: str) -> str:
+    cleaned = _normalize_clause(text)
+    if not cleaned:
+        return ""
+    return cleaned[0].lower() + cleaned[1:]
+
+
+def _build_personalization_clause(
+    manuscript: Manuscript,
+    publisher: Publisher,
+    fit_compatible: bool,
+) -> str:
+    clauses = []
+    fit = manuscript.personalization_notes or ""
+    if fit and not fit_compatible:
+        fit = ""
+    fit_clause = _make_clause(fit)
+    if fit_clause:
+        clauses.append(fit_clause)
+
+    criteria = publisher.special_criteria or ""
+    criteria_clause = _make_clause(criteria)
+    if criteria_clause:
+        if not re.search(r"\byou\b", criteria_clause, flags=re.IGNORECASE):
+            criteria_clause = f"you have {criteria_clause}"
+        clauses.append(criteria_clause)
+
+    if clauses:
+        return " and ".join(clauses)
+    return _fallback_personalization(publisher)
 
 
 def render_query_letter(
@@ -174,13 +250,15 @@ def render_query_letter(
     lines.append("Dear Acquisitions Team,")
     lines.append("")
 
-    personalization = _normalize_clause(sections.personalization_reason)
-    if not personalization:
-        personalization = _fallback_personalization(publisher)
+    personalization = _build_personalization_clause(
+        manuscript,
+        publisher,
+        sections.fit_compatible,
+    )
     lines.append(
         "I am seeking representation for my "
         f"{manuscript.genre} novel, {manuscript.title}, "
-        f"complete at {manuscript.word_count} words. "
+        f"complete at {_format_word_count(manuscript.word_count)} words. "
         f"I am querying you because {personalization}."
     )
     lines.append("")
@@ -197,8 +275,9 @@ def render_query_letter(
             lines.append(paragraph.strip())
             lines.append("")
 
-    if manuscript.comps:
-        comps_line = ", ".join(manuscript.comps)
+    comps = _sanitize_comps(publisher.comps or [])
+    if comps:
+        comps_line = _join_comps(comps)
         lines.append(
             f"{manuscript.title} will appeal to readers of {comps_line}."
         )
