@@ -19,23 +19,23 @@ class QueryLetterSections(BaseModel):
             "literary_professional, tense_professional."
         ),
     )
-    personalization_reason: str = Field(
+    opening_personalization: str = Field(
         ...,
         description=(
-            "Why this publisher is a fit. Phrase as a clause that can follow "
-            "'I am querying you because ...' without adding a leading period."
-        ),
-    )
-    fit_compatible: bool = Field(
-        ...,
-        description=(
-            "True if the publisher's strengths align with the manuscript's genre "
-            "and audience; false if they conflict."
+            "1-2 sentences explaining fit with the agency/publisher. Mention the genre "
+            "fit and, if comps are provided, reference them as similar titles."
         ),
     )
     summary_paragraphs: List[str] = Field(
         ...,
         description="1-2 paragraphs summarizing the story with protagonist, goal, stakes.",
+    )
+    detail_paragraph: str = Field(
+        ...,
+        description=(
+            "A short paragraph with specific character, location, and unique details "
+            "that deepen the summary. Must be distinct from the summary."
+        ),
     )
     bio: str = Field(
         ...,
@@ -45,6 +45,47 @@ class QueryLetterSections(BaseModel):
         default="Sincerely",
         description="A short signoff such as 'Sincerely' or 'Warmly'.",
     )
+
+
+class BatchedPublisherSections(BaseModel):
+    publisher: str = Field(..., description="Publisher name matching the input list.")
+    tone: str = Field(
+        ...,
+        description=(
+            "Chosen tone for the letter. Select one of: professional, warm_professional, "
+            "literary_professional, tense_professional."
+        ),
+    )
+    opening_personalization: str = Field(
+        ...,
+        description=(
+            "1-2 sentences explaining fit with the agency/publisher. Mention the genre "
+            "fit and, if comps are provided, reference them as similar titles."
+        ),
+    )
+    summary_paragraphs: List[str] = Field(
+        ...,
+        description="1-2 paragraphs summarizing the story with protagonist, goal, stakes.",
+    )
+    detail_paragraph: str = Field(
+        ...,
+        description=(
+            "A short paragraph with specific character, location, and unique details "
+            "that deepen the summary. Must be distinct from the summary."
+        ),
+    )
+    bio: str = Field(
+        ...,
+        description="1-2 factual sentences about the author and credentials.",
+    )
+    signoff: str = Field(
+        default="Sincerely",
+        description="A short signoff such as 'Sincerely' or 'Warmly'.",
+    )
+
+
+class BatchedQueryLetterResponse(BaseModel):
+    letters: List[BatchedPublisherSections]
 
 
 def load_fewshot_examples() -> List[str]:
@@ -60,7 +101,7 @@ def load_fewshot_examples() -> List[str]:
             examples.append(modified_path.read_text(encoding="utf-8").strip())
     if not examples:
         raise FileNotFoundError(f"No few-shot examples found in: {base_dir}")
-    return examples
+    return examples[:4]
 
 
 def build_composer_prompt(
@@ -74,40 +115,65 @@ def build_composer_prompt(
         "described in the user message. Do not include markdown, commentary, or extra keys."
     )
 
-    personalization = manuscript.personalization_notes or ""
-    criteria = publisher.special_criteria or ""
-    imprints = ", ".join(publisher.imprints) if publisher.imprints else "None"
     comps = ", ".join(publisher.comps) if publisher.comps else "None provided"
 
     example_block = "\n\n".join(
         f"Example {idx + 1}:\n{example}" for idx, example in enumerate(examples)
     )
 
+    format_guidance = (
+        "Section 1: Your Query’s Opening\n"
+        "Show you targeted the agent for a reason and quickly introduce the novel "
+        "with title, word count, and genre. If no personalization is provided, keep "
+        "the opening focused on the novel without inventing agent-specific details.\n\n"
+        "Section 2: The Story\n"
+        "Summarize the book in one or two paragraphs with clear protagonist, goal, "
+        "stakes, and a few specific details. Avoid a full plot rundown.\n\n"
+        "Section 3: Your Bio\n"
+        "Share any relevant writing credentials or background in 1–2 sentences.\n\n"
+        "Section 4: The Closing\n"
+        "End with a short, polite closing and manuscript availability."
+    )
+
     user_text = (
         f"Examples:\n{example_block}\n\n"
-        "Task: Fill the JSON schema using the inputs below. Use the examples for tone only. "
-        "Do NOT copy their structure into any field. Output JSON only.\n\n"
+        "Task: Fill the JSON schema using the inputs below. Use the examples to guide "
+        "voice and natural phrasing. Output JSON only.\n\n"
+        "Format guidance:\n"
+        f"{format_guidance}\n\n"
+        "Use opening_personalization for the opening fit paragraph. It should mention "
+        "the genre fit with the publisher and, if comps are provided, cite those comps "
+        "as similar titles. This paragraph will appear before the "
+        "\"I'm hoping you will consider my ...\" line.\n\n"
+        "Important: opening_personalization must NOT repeat the book title or word "
+        "count, and must NOT include the phrase \"I'm hoping you will consider\".\n\n"
+        "Important: summary_paragraphs must NOT repeat the book title or word count.\n"
+        "Important: detail_paragraph must be clearly separate from the summary. "
+        "If detail_summary is provided, use it as the primary source. If it is not "
+        "provided and infer_detail_summary is true, infer from the summary. If "
+        "infer_detail_summary is false and detail_summary is missing, keep the "
+        "detail_paragraph brief and avoid introducing new plot points.\n\n"
+        "Style: Avoid em dashes or dash-heavy sentences; prefer periods or commas.\n\n"
         "Schema:\n"
         "{\n"
         '  "tone": "professional",\n'
-        '  "personalization_reason": "string",\n'
-        '  "fit_compatible": true,\n'
+        '  "opening_personalization": "string",\n'
         '  "summary_paragraphs": ["string", "..."],\n'
+        '  "detail_paragraph": "string",\n'
         '  "bio": "string",\n'
         '  "signoff": "Sincerely"\n'
         "}\n\n"
         f"Publisher name: {publisher.name}\n"
-        f"Imprints: {imprints}\n"
-        f"Personalization notes: {personalization or 'None provided'}\n"
-        f"Publisher strength criteria: {criteria or 'None provided'}\n"
+        f"Publisher comps: {comps}\n"
         f"Format: {options.format}\n\n"
         "Manuscript:\n"
         f"- Title: {manuscript.title}\n"
         f"- Word count: {manuscript.word_count}\n"
         f"- Genre: {manuscript.genre}\n"
         f"- Summary: {manuscript.summary}\n"
+        f"- Detail summary: {manuscript.detail_summary or 'None provided'}\n"
         f"- Paraphrase summary: {options.paraphrase_summary}\n"
-        f"- Comps: {comps}\n"
+        f"- Infer detail summary: {options.infer_detail_summary}\n"
         f"- Author name: {manuscript.author_name}\n"
         f"- Author bio: {manuscript.author_bio or 'None provided'}\n"
     )
@@ -117,69 +183,102 @@ def build_composer_prompt(
             "\nInstruction: Use the summary text verbatim in the plot description "
             "section. Do not paraphrase or embellish it."
         )
-    user_text += (
-        "\nConstraints:\n"
-        "- tone: choose one of professional, warm_professional, literary_professional, "
-        "tense_professional based on the manuscript and publisher.\n"
-        "- personalization_reason: clause only (no leading 'I am querying you because').\n"
-        "- fit_compatible: set to false if criteria conflict with the manuscript genre.\n"
-        "- summary_paragraphs: story summary only; do not include title/word count/genre, "
-        "comps, bio, or closing.\n"
-        "- bio: 1-2 factual sentences.\n"
-        "- Use the chosen tone when writing summary and bio.\n"
-    )
 
     return [SystemMessage(content=system_text), HumanMessage(content=user_text)]
 
 
-def _normalize_clause(text: str) -> str:
-    cleaned = text.strip()
-    cleaned = re.sub(
-        r"^(i am querying you because|i hope you will consider|because)\s+",
-        "",
-        cleaned,
-        flags=re.IGNORECASE,
-    ).strip()
-    cleaned = re.sub(r"^[\W_]+", "", cleaned)
-    if cleaned.endswith("."):
-        cleaned = cleaned[:-1].strip()
-    return cleaned
+def build_batched_composer_prompt(
+    manuscript: Manuscript,
+    publishers: List[Publisher],
+    options: ComposerOptions,
+    examples: List[str],
+) -> List:
+    system_text = (
+        "You are a query letter composer. Return JSON only that matches the schema "
+        "described in the user message. Do not include markdown, commentary, or extra keys."
+    )
 
+    example_block = "\n\n".join(
+        f"Example {idx + 1}:\n{example}" for idx, example in enumerate(examples)
+    )
 
-def _sanitize_summary_paragraphs(paragraphs: List[str]) -> List[str]:
-    cleaned_paragraphs = []
-    for paragraph in paragraphs:
-        text = paragraph.strip()
-        if not text:
-            continue
-        lowered = text.lower()
-        if any(
-            marker in lowered
-            for marker in (
-                "i am seeking representation",
-                "i am querying you because",
-                "dear ",
-                "will appeal to readers",
-                "thank you for your time",
-                "sincerely",
-                "warmly",
-            )
-        ):
-            continue
-        cleaned_paragraphs.append(text)
-    return cleaned_paragraphs
+    format_guidance = (
+        "Section 1: Your Query’s Opening\n"
+        "Show you targeted the agent for a reason and quickly introduce the novel "
+        "with title, word count, and genre. If no personalization is provided, keep "
+        "the opening focused on the novel without inventing agent-specific details.\n\n"
+        "Section 2: The Story\n"
+        "Summarize the book in one or two paragraphs with clear protagonist, goal, "
+        "stakes, and a few specific details. Avoid a full plot rundown.\n\n"
+        "Section 3: Your Bio\n"
+        "Share any relevant writing credentials or background in 1–2 sentences.\n\n"
+        "Section 4: The Closing\n"
+        "End with a short, polite closing and manuscript availability."
+    )
 
+    publisher_lines = []
+    for idx, publisher in enumerate(publishers, start=1):
+        comps = ", ".join(publisher.comps) if publisher.comps else "None provided"
+        publisher_lines.append(
+            f"{idx}. {publisher.name} (comps: {comps})"
+        )
+    publishers_block = "\n".join(publisher_lines) if publisher_lines else "None"
 
-def _sanitize_bio(bio: str, author_name: str) -> str:
-    text = bio.strip()
-    text = re.sub(r"\s+—\s+" + re.escape(author_name) + r"\s*$", "", text)
-    return text.strip()
+    user_text = (
+        f"Examples:\n{example_block}\n\n"
+        "Task: Fill the JSON schema using the inputs below. Use the examples to guide "
+        "voice and natural phrasing. Output JSON only.\n\n"
+        "Format guidance:\n"
+        f"{format_guidance}\n\n"
+        "Use opening_personalization for the opening fit paragraph. It should mention "
+        "the genre fit with the publisher and, if comps are provided, cite those comps "
+        "as similar titles. This paragraph will appear before the "
+        "\"I'm hoping you will consider my ...\" line.\n\n"
+        "Important: opening_personalization must NOT repeat the book title or word "
+        "count, and must NOT include the phrase \"I'm hoping you will consider\".\n\n"
+        "Important: summary_paragraphs must NOT repeat the book title or word count.\n"
+        "Important: detail_paragraph must be clearly separate from the summary. "
+        "If detail_summary is provided, use it as the primary source. If it is not "
+        "provided and infer_detail_summary is true, infer from the summary. If "
+        "infer_detail_summary is false and detail_summary is missing, keep the "
+        "detail_paragraph brief and avoid introducing new plot points.\n\n"
+        "Style: Avoid em dashes or dash-heavy sentences; prefer periods or commas.\n\n"
+        "Schema:\n"
+        "{\n"
+        '  "letters": [\n'
+        "    {\n"
+        '      "publisher": "Publisher Name",\n'
+        '      "tone": "professional",\n'
+        '      "opening_personalization": "string",\n'
+        '      "summary_paragraphs": ["string", "..."],\n'
+        '      "detail_paragraph": "string",\n'
+        '      "bio": "string",\n'
+        '      "signoff": "Sincerely"\n'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Publishers (return one entry per publisher, in the same order):\n"
+        f"{publishers_block}\n\n"
+        f"Format: {options.format}\n\n"
+        "Manuscript:\n"
+        f"- Title: {manuscript.title}\n"
+        f"- Word count: {manuscript.word_count}\n"
+        f"- Genre: {manuscript.genre}\n"
+        f"- Summary: {manuscript.summary}\n"
+        f"- Detail summary: {manuscript.detail_summary or 'None provided'}\n"
+        f"- Paraphrase summary: {options.paraphrase_summary}\n"
+        f"- Infer detail summary: {options.infer_detail_summary}\n"
+        f"- Author name: {manuscript.author_name}\n"
+        f"- Author bio: {manuscript.author_bio or 'None provided'}\n"
+    )
 
+    if not options.paraphrase_summary:
+        user_text += (
+            "\nInstruction: Use the summary text verbatim in the plot description "
+            "section. Do not paraphrase or embellish it."
+        )
 
-def _fallback_personalization(publisher: Publisher) -> str:
-    if publisher.special_criteria:
-        return publisher.special_criteria.strip()
-    return "your publishing interests align with my manuscript"
+    return [SystemMessage(content=system_text), HumanMessage(content=user_text)]
 
 
 def _format_word_count(word_count: int) -> str:
@@ -208,36 +307,17 @@ def _sanitize_comps(comps: List[str]) -> List[str]:
     return cleaned
 
 
-def _make_clause(text: str) -> str:
-    cleaned = _normalize_clause(text)
-    if not cleaned:
-        return ""
-    return cleaned[0].lower() + cleaned[1:]
-
-
-def _build_personalization_clause(
-    manuscript: Manuscript,
-    publisher: Publisher,
-    fit_compatible: bool,
-) -> str:
-    clauses = []
-    fit = manuscript.personalization_notes or ""
-    if fit and not fit_compatible:
-        fit = ""
-    fit_clause = _make_clause(fit)
-    if fit_clause:
-        clauses.append(fit_clause)
-
-    criteria = publisher.special_criteria or ""
-    criteria_clause = _make_clause(criteria)
-    if criteria_clause:
-        if not re.search(r"\byou\b", criteria_clause, flags=re.IGNORECASE):
-            criteria_clause = f"you have {criteria_clause}"
-        clauses.append(criteria_clause)
-
-    if clauses:
-        return " and ".join(clauses)
-    return _fallback_personalization(publisher)
+def _signoff_for_tone(tone: str, fallback: str) -> str:
+    normalized = (tone or "").strip().lower()
+    if normalized == "warm_professional":
+        return "Warmly"
+    if normalized == "literary_professional":
+        return "Sincerely"
+    if normalized == "tense_professional":
+        return "Sincerely"
+    if normalized == "professional":
+        return "Sincerely"
+    return fallback or "Sincerely"
 
 
 def render_query_letter(
@@ -250,47 +330,71 @@ def render_query_letter(
     lines.append("Dear Acquisitions Team,")
     lines.append("")
 
-    personalization = _build_personalization_clause(
-        manuscript,
-        publisher,
-        sections.fit_compatible,
-    )
+    if sections.opening_personalization.strip():
+        lines.append(sections.opening_personalization.strip())
+        lines.append("")
+
     lines.append(
-        "I am seeking representation for my "
+        "I'm hoping you will consider my "
         f"{manuscript.genre} novel, {manuscript.title}, "
-        f"complete at {_format_word_count(manuscript.word_count)} words. "
-        f"I am querying you because {personalization}."
+        f"complete at {_format_word_count(manuscript.word_count)} words."
     )
     lines.append("")
 
     if paraphrase_summary:
-        summary_paragraphs = _sanitize_summary_paragraphs(
-            sections.summary_paragraphs
-        )
+        summary_paragraphs = sections.summary_paragraphs
     else:
         summary_paragraphs = [manuscript.summary.strip()]
 
     for paragraph in summary_paragraphs:
-        if paragraph.strip():
-            lines.append(paragraph.strip())
+        cleaned_paragraph = paragraph.strip()
+        lowered = cleaned_paragraph.lower()
+        if lowered.startswith("i'm hoping you will consider"):
+            cleaned_paragraph = cleaned_paragraph.split(".", 1)[-1].strip()
+        elif lowered.startswith("i am seeking representation"):
+            cleaned_paragraph = cleaned_paragraph.split(".", 1)[-1].strip()
+        if cleaned_paragraph:
+            sentences = [s.strip() for s in cleaned_paragraph.split(".") if s.strip()]
+            filtered_sentences = []
+            title_lower = manuscript.title.lower()
+            word_count_token = _format_word_count(manuscript.word_count)
+            for sentence in sentences:
+                sentence_lower = sentence.lower()
+                if title_lower in sentence_lower:
+                    continue
+                if word_count_token in sentence:
+                    continue
+                if str(manuscript.word_count) in sentence:
+                    continue
+                filtered_sentences.append(sentence)
+            cleaned_paragraph = ". ".join(filtered_sentences).strip()
+        if cleaned_paragraph:
+            lines.append(cleaned_paragraph)
             lines.append("")
+
+    detail_paragraph = sections.detail_paragraph.strip()
+    if detail_paragraph:
+        lines.append(detail_paragraph)
+        lines.append("")
 
     comps = _sanitize_comps(publisher.comps or [])
     if comps:
         comps_line = _join_comps(comps)
         lines.append(
-            f"{manuscript.title} will appeal to readers of {comps_line}."
+            f"{manuscript.title} will appeal to readers of {comps_line} "
+            "because of its shared genre and tonal style."
         )
         lines.append("")
 
-    lines.append(_sanitize_bio(sections.bio, manuscript.author_name))
+    lines.append(sections.bio.strip())
     lines.append("")
     lines.append(
         "Thank you for your time and consideration. The full manuscript is available "
         "upon request."
     )
     lines.append("")
-    lines.append(f"{sections.signoff},")
+    signoff = _signoff_for_tone(sections.tone, sections.signoff)
+    lines.append(f"{signoff},")
     lines.append(manuscript.author_name)
 
     return "\n".join(lines).strip()
@@ -326,3 +430,48 @@ def generate_query_letter(
         sections,
         paraphrase_summary=options.paraphrase_summary,
     )
+
+
+def generate_query_letters_batch(
+    messages: List,
+    manuscript: Manuscript,
+    publishers: List[Publisher],
+    options: ComposerOptions,
+) -> List[tuple[Publisher, QueryLetterSections]]:
+    temperature = 0
+    if "gpt-5" in (config.CHAT_MODEL or "").lower():
+        # gpt-5 family only supports temperature=1
+        temperature = 1
+    model = ChatOpenAI(
+        api_key=config.OPENAI_API_KEY,
+        base_url=config.BASE_URL,
+        model=config.CHAT_MODEL,
+        temperature=temperature,
+    )
+    response = model.invoke(messages)
+    raw = response.content.strip()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Model did not return valid JSON: {exc}") from exc
+
+    batch = BatchedQueryLetterResponse.model_validate(data)
+    sections_by_publisher = {
+        entry.publisher: QueryLetterSections(
+            tone=entry.tone,
+            opening_personalization=entry.opening_personalization,
+            summary_paragraphs=entry.summary_paragraphs,
+            detail_paragraph=entry.detail_paragraph,
+            bio=entry.bio,
+            signoff=entry.signoff,
+        )
+        for entry in batch.letters
+    }
+
+    results = []
+    for publisher in publishers:
+        sections = sections_by_publisher.get(publisher.name)
+        if not sections:
+            raise ValueError(f"Missing letter for publisher: {publisher.name}")
+        results.append((publisher, sections))
+    return results

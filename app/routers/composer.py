@@ -2,9 +2,10 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas.composer import ComposerRequest, ComposerResponse, LetterResult
 from app.services.composer import (
-    build_composer_prompt,
-    generate_query_letter,
+    build_batched_composer_prompt,
+    generate_query_letters_batch,
     load_fewshot_examples,
+    render_query_letter,
 )
 
 
@@ -27,38 +28,47 @@ async def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
         warnings = []
         if not publisher.comps:
             warnings.append("comps_missing")
-        if not payload.manuscript.personalization_notes and not publisher.special_criteria:
+        if not payload.manuscript.personalization_notes:
             warnings.append("personalization_missing")
 
-        try:
-            messages = build_composer_prompt(
+        results.append(
+            LetterResult(
+                publisher=publisher.name,
+                letter="",
+                warnings=warnings,
+            )
+        )
+
+    try:
+        messages = build_batched_composer_prompt(
+            manuscript=payload.manuscript,
+            publishers=payload.publishers,
+            options=payload.options,
+            examples=examples,
+        )
+        batch_sections = generate_query_letters_batch(
+            messages=messages,
+            manuscript=payload.manuscript,
+            publishers=payload.publishers,
+            options=payload.options,
+        )
+        letters_by_publisher = {
+            publisher.name: render_query_letter(
                 manuscript=payload.manuscript,
                 publisher=publisher,
-                options=payload.options,
-                examples=examples,
+                sections=sections,
+                paraphrase_summary=payload.options.paraphrase_summary,
             )
-            letter = generate_query_letter(
-                messages,
-                manuscript=payload.manuscript,
-                publisher=publisher,
-                options=payload.options,
-            )
-            results.append(
-                LetterResult(
-                    publisher=publisher.name,
-                    letter=letter,
-                    warnings=warnings,
-                )
-            )
-        except Exception as exc:
-            errors.append(f"{publisher.name}: {exc}")
-            results.append(
-                LetterResult(
-                    publisher=publisher.name,
-                    letter="",
-                    status="error",
-                    warnings=warnings,
-                )
-            )
+            for publisher, sections in batch_sections
+        }
+        for entry in results:
+            entry.letter = letters_by_publisher.get(entry.publisher, "")
+            if not entry.letter:
+                entry.status = "error"
+                errors.append(f"{entry.publisher}: missing letter in batch response")
+    except Exception as exc:
+        errors.append(str(exc))
+        for entry in results:
+            entry.status = "error"
 
     return ComposerResponse(letters=results, errors=errors)

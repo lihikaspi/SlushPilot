@@ -8,6 +8,7 @@ class Manuscript(BaseModel):
     word_count: int
     genre: str
     summary: str
+    detail_summary: Optional[str] = None
     author_bio: Optional[str] = None
     author_name: str
     personalization_notes: Optional[str] = None
@@ -15,14 +16,13 @@ class Manuscript(BaseModel):
 
 class Publisher(BaseModel):
     name: str
-    imprints: Optional[List[str]] = None
     comps: Optional[List[str]] = None
-    special_criteria: Optional[str] = None
 
 
 class ComposerOptions(BaseModel):
     format: str = "classic_query_letter"
     paraphrase_summary: bool = True
+    infer_detail_summary: bool = True
 
 
 class ComposerRequest(BaseModel):
