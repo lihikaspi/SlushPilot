@@ -145,7 +145,7 @@ export default function EntryPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors font-semibold tracking-widest uppercase text-sm disabled:opacity-50 cursor-pointer"
+            className="w-full py-3 bg-[#1a1a1a] text-white hover:bg-[#333] transition-colors font-semibold font-sans tracking-widest uppercase text-sm disabled:opacity-50 cursor-pointer"
           >
             {/* Updated button text */}
             {loading ? 'Processing...' : isSignUp ? 'Begin' : 'Enter'}
