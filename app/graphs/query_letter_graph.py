@@ -8,15 +8,16 @@ except ImportError:  # pragma: no cover - optional dependency
     END = None
     StateGraph = None
 
+import config
+from app.agents.clarify import generate_clarification
 from app.agents.composer import compose_query_letters
+from app.agents.confirm import parse_confirmation
+from app.agents.intake import parse_intake
 from app.agents.strategist import (
     StrategistManuscript,
     create_strategist_service,
     execute_strategist_pipeline,
 )
-import config
-from app.agents.clarify import generate_clarification
-from app.agents.intake import parse_intake
 from app.schemas.composer import (
     ComposerOptions,
     ComposerRequest,
@@ -38,6 +39,8 @@ class QueryLetterState(TypedDict, total=False):
     missing_fields: List[str]
     errors: List[str]
     next_step: str
+    await_confirmation: bool
+    publisher_confirmation: Optional[bool]
 
 
 def _missing_strategist_fields(strategist_data: Dict[str, Any]) -> List[str]:
@@ -115,10 +118,20 @@ def _strategist_ready() -> List[str]:
     return errors
 
 
+def _format_publishers(publishers: List[Publisher]) -> str:
+    if not publishers:
+        return "No publishers found."
+    lines = [f"{idx}. {publisher.name}" for idx, publisher in enumerate(publishers, 1)]
+    return "\n".join(lines)
+
+
 def _supervisor_node(state: QueryLetterState) -> dict:
     errors = _strategist_ready()
     if errors:
         return {"errors": errors, "next_step": "end"}
+
+    if state.get("await_confirmation") and state.get("user_message"):
+        return {"next_step": "confirm"}
 
     if state.get("user_message"):
         return {"next_step": "intake"}
@@ -134,19 +147,37 @@ def _supervisor_node(state: QueryLetterState) -> dict:
     if os.getenv("DEBUG_INTAKE") == "1":
         print("Supervisor missing strategist fields:", missing_fields)
     if missing_fields:
-        return {"missing_fields": missing_fields, "next_step": "clarify"}
+        return {
+            "missing_fields": missing_fields,
+            "next_step": "clarify",
+        }
 
     if not state.get("publishers"):
-        return {"missing_fields": [], "next_step": "strategist"}
+        return {
+            "missing_fields": [],
+            "next_step": "strategist",
+        }
+
+    if state.get("await_confirmation") and state.get("publisher_confirmation") is None:
+        return {"next_step": "end"}
+
+    if state.get("publisher_confirmation") is False:
+        return {"next_step": "end"}
 
     missing_fields = _missing_composer_fields(composer_data)
     if os.getenv("DEBUG_INTAKE") == "1":
         print("Supervisor missing composer fields:", missing_fields)
     if missing_fields:
-        return {"missing_fields": missing_fields, "next_step": "clarify"}
+        return {
+            "missing_fields": missing_fields,
+            "next_step": "clarify",
+        }
 
     if not state.get("letters"):
-        return {"missing_fields": [], "next_step": "composer"}
+        return {
+            "missing_fields": [],
+            "next_step": "composer",
+        }
 
     return {"missing_fields": [], "next_step": "end"}
 
@@ -160,7 +191,20 @@ def _strategist_node(state: QueryLetterState) -> dict:
         Publisher(name=entry.publisher_name or entry.publisher_id, comps=entry.comps)
         for entry in results
     ]
-    return {"publishers": publishers, "strategist_input": strategist_input}
+    assistant_message = (
+        "I found these publishers that look like a good fit:\n\n"
+        f"{_format_publishers(publishers)}\n\n"
+        "Would you like me to draft query letters for them?"
+    )
+    if os.getenv("DEBUG_INTAKE") == "1":
+        print("Strategist assistant_message length:", len(assistant_message))
+    return {
+        "publishers": publishers,
+        "strategist_input": strategist_input,
+        "assistant_message": assistant_message,
+        "await_confirmation": True,
+        "publisher_confirmation": None,
+    }
 
 
 def _composer_node(state: QueryLetterState) -> dict:
@@ -173,7 +217,11 @@ def _composer_node(state: QueryLetterState) -> dict:
         options=options,
     )
     letters = compose_query_letters(payload)
-    return {"letters": letters, "composer_input": composer_input}
+    return {
+        "letters": letters,
+        "composer_input": composer_input,
+        "assistant_message": "",
+    }
 
 
 def _intake_node(state: QueryLetterState) -> dict:
@@ -201,6 +249,44 @@ def _intake_node(state: QueryLetterState) -> dict:
         "composer_data": composer_data,
         "user_message": "",
         "missing_fields": [],
+        "assistant_message": "",
+    }
+
+
+def _confirm_node(state: QueryLetterState) -> dict:
+    user_message = (state.get("user_message") or "").strip()
+    decision = parse_confirmation(user_message)
+    if decision is None:
+        return {
+            "assistant_message": (
+                "Would you like me to draft query letters for the publishers I found? "
+                "Please reply with yes or no."
+            ),
+            "user_message": "",
+            "await_confirmation": True,
+            "publisher_confirmation": None,
+            "strategist_data": state.get("strategist_data"),
+            "composer_data": state.get("composer_data"),
+            "publishers": state.get("publishers"),
+        }
+    if decision is False:
+        return {
+            "assistant_message": "Got it. Let me know if you want to continue later.",
+            "user_message": "",
+            "await_confirmation": False,
+            "publisher_confirmation": False,
+            "strategist_data": state.get("strategist_data"),
+            "composer_data": state.get("composer_data"),
+            "publishers": state.get("publishers"),
+        }
+    return {
+        "assistant_message": "",
+        "user_message": "",
+        "await_confirmation": False,
+        "publisher_confirmation": True,
+        "strategist_data": state.get("strategist_data"),
+        "composer_data": state.get("composer_data"),
+        "publishers": state.get("publishers"),
     }
 
 
@@ -225,7 +311,10 @@ def _clarify_node(state: QueryLetterState) -> dict:
 
 
 def _route_from_supervisor(state: QueryLetterState) -> str:
-    return state.get("next_step", "end")
+    next_step = state.get("next_step", "end")
+    if os.getenv("DEBUG_INTAKE") == "1":
+        print("Supervisor routing to:", next_step)
+    return next_step
 
 
 def build_query_letter_graph():
@@ -240,6 +329,7 @@ def build_query_letter_graph():
     graph.add_node("strategist", _strategist_node)
     graph.add_node("composer", _composer_node)
     graph.add_node("clarify", _clarify_node)
+    graph.add_node("confirm", _confirm_node)
 
     graph.set_entry_point("supervisor")
     graph.add_conditional_edges(
@@ -250,11 +340,13 @@ def build_query_letter_graph():
             "clarify": "clarify",
             "strategist": "strategist",
             "composer": "composer",
+            "confirm": "confirm",
             "end": END,
         },
     )
     graph.add_edge("intake", "supervisor")
-    graph.add_edge("strategist", "supervisor")
+    graph.add_edge("strategist", END)
     graph.add_edge("composer", "supervisor")
+    graph.add_edge("confirm", "supervisor")
     graph.add_edge("clarify", END)
     return graph.compile()

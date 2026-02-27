@@ -30,6 +30,10 @@ def main() -> None:
         user_message = input("\nHello! how can I help you today? ").strip()
         state["user_message"] = user_message
         result = graph.invoke(state)
+        if os.getenv("DEBUG_INTAKE") == "1":
+            print("Result keys:", sorted(result.keys()))
+            if "assistant_message" in result:
+                print("Result assistant_message length:", len(result.get("assistant_message") or ""))
 
         if result.get("errors"):
             print("Errors:")
