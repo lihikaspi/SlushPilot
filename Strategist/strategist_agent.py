@@ -42,9 +42,7 @@ class PublisherScore(BaseModel):
     publisher_id: str
     score: int = Field(description="Relevance score from 1 to 10 based on how well they fit the manuscript.")
     reasoning: str = Field(description="A brief 1-sentence explanation for the score based on their metadata.")
-    comps: List = Field(description="A short list of the most relevant comp titles from their recent publications that align with the manuscript, passing a certain threshold")
-    # does genre align
-    # TODO check where to add
+    comps: List[str] = Field(description="A list of 1 to 3 specific book titles from the publisher's 'recent_comp_titles' metadata that most closely match the author's manuscript. DO NOT hallucinate titles outside of their provided metadata.")
 
 
 class RerankedList(BaseModel):
@@ -134,7 +132,8 @@ def rerank_publishers(manuscript: ManuscriptProfile, candidates: list) -> List[P
     RETRIEVED PUBLISHERS:
     {json.dumps(clean_candidates, indent=2)}
 
-    Score each publisher from 1 to 10 based strictly on how well their genres and recent comp titles align with the manuscript.
+    Task 1: Score each publisher from 1 to 10 based strictly on how well their genres and recent comp titles align with the manuscript.
+    Task 2: Extract the 1-3 best 'aligned_comp_titles' from their metadata that prove they publish similar books. If none are a perfect match, return an empty list.
     """
 
     response = client.beta.chat.completions.parse(
