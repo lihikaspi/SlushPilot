@@ -145,7 +145,7 @@ export default function RootLayout({
             </header>
           )}
 
-          <main className="flex-1 min-h-screen relative font-serif">
+          <main className="flex-1 h-screen relative font-serif">
             {children}
           </main>
         </div>
