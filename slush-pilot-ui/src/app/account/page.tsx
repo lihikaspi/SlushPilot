@@ -65,9 +65,9 @@ export default function AccountPage() {
       .eq('username', profile.username);
 
     if (error) {
-      setNotification({ type: 'error', text: 'failed to update the biography' });
+      setNotification({ type: 'error', text: 'failed to update' });
     } else {
-      setNotification({ type: 'success', text: 'biography updated successfully' });
+      setNotification({ type: 'success', text: 'biography updated' });
     }
 
     setSaving(false);
@@ -80,10 +80,7 @@ export default function AccountPage() {
   if (loading) return <div className="p-12 font-serif italic text-[#999]">Unrolling parchment...</div>;
 
   return (
-    // Container aligned with Dashboard: p-8 max-w-[1600px]
     <div className="p-8 max-w-[1600px] mx-auto relative h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
-
-      {/* Header aligned with Dashboard: items-end and mb-12 */}
       <header className="flex justify-between items-end mb-12 shrink-0">
         <div>
           <h1 className="text-4xl font-bold text-[#1a1a1a] mb-2 tracking-tight">Author Biography</h1>
@@ -93,17 +90,14 @@ export default function AccountPage() {
         <button
           onClick={(e) => handleUpdate(e as any)}
           disabled={saving}
-          // Button aligned with Dashboard: px-6 py-3 and shadow-sm
           className="bg-[#1a1a1a] text-white px-6 py-3 font-sans font-bold uppercase tracking-widest text-xs hover:bg-[#333] transition-all cursor-pointer shadow-sm disabled:opacity-50 h-fit"
         >
           {saving ? 'Inking parchment...' : 'Update Biography'}
         </button>
       </header>
 
-      {/* The form content occupies the remaining vertical space */}
       <form onSubmit={handleUpdate} className="bg-white border border-[#dcd6bc] shadow-sm p-10 space-y-8 flex-1 flex flex-col min-h-0 overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 flex-1 min-h-0">
-
           <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 overflow-y-auto pr-2 scrollbar-thin">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Legal Name / Nom de Plume *</label>
@@ -125,7 +119,6 @@ export default function AccountPage() {
                 className="w-full px-4 py-2 border-b border-[#eee] outline-none bg-[#f9f9f9] font-serif text-[#999] cursor-default pointer-events-none"
               />
             </div>
-
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Phone Number</label>
               <input
@@ -146,7 +139,6 @@ export default function AccountPage() {
                 placeholder="author@inkwell.com"
               />
             </div>
-
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">City</label>
               <input
@@ -181,26 +173,25 @@ export default function AccountPage() {
         </div>
       </form>
 
-      {/* Notifications remain at the bottom right */}
       {notification && (
         <div className="fixed bottom-8 right-8 z-[100] animate-in slide-in-from-right-full fade-in duration-300">
-          <div className={`px-6 py-4 shadow-2xl border flex items-center gap-3 rounded-sm ${
+          <div className={`px-6 py-4 shadow-xl border flex items-center gap-3 rounded-sm backdrop-blur-sm ${
             notification.type === 'success' 
-              ? 'bg-emerald-600 border-emerald-500 text-white' 
-              : 'bg-rose-600 border-rose-500 text-white'
+              ? 'bg-emerald-50/90 border-emerald-200 text-emerald-800' 
+              : 'bg-rose-50/90 border-rose-200 text-rose-800'
           }`}>
-            <div className="w-5 h-5 flex items-center justify-center bg-white/20 rounded-full">
+            <div className={`w-5 h-5 flex items-center justify-center rounded-full ${notification.type === 'success' ? 'bg-emerald-200' : 'bg-rose-200'}`}>
               {notification.type === 'success' ? (
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3 text-emerald-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3 h-3 text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
             </div>
-            <p className="font-sans font-bold text-xs uppercase tracking-widest">
+            <p className="font-sans font-bold text-[10px] uppercase tracking-widest opacity-80">
               {notification.text}
             </p>
           </div>
