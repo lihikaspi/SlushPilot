@@ -14,21 +14,13 @@ const PROJECT_STATUS: Record<string, { label: string; colorClass: string }> = {
   respond: { label: "Response Received", colorClass: "bg-rose-600" }
 };
 
-const LETTER_STATUS: Record<string, { label: string; colorClass: string }> = {
-  new: { label: "Unwritten", colorClass: "bg-gray-400" },
-  draft: { label: "Drafted", colorClass: "bg-blue-500" },
-  sent: { label: "Sent", colorClass: "bg-emerald-500" },
-  respond: { label: "Responses", colorClass: "bg-rose-600" },
-  rejected: { label: "Rejected", colorClass: "bg-black" }
-};
-
 interface Project {
   id: string;
   title: string;
   current_stage: string;
   updated_at: string;
   visible: boolean;
-  query_letters: { status: string }[];
+  query_letters: { id: string }[];
 }
 
 export default function DashboardPage() {
@@ -55,15 +47,8 @@ export default function DashboardPage() {
       { bg: 'bg-purple-600/10', spine: 'bg-purple-600/30', text: 'text-purple-900', border: 'border-purple-600/20' },
       { bg: 'bg-teal-600/10', spine: 'bg-teal-600/30', text: 'text-teal-900', border: 'border-teal-600/20' },
     ];
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    let hash = 0;    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
     return bookColors[Math.abs(hash) % bookColors.length];
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
   };
 
   const fetchDashboardData = async () => {
@@ -73,7 +58,11 @@ export default function DashboardPage() {
     const { data: profile } = await supabase.from('profiles').select('id').eq('username', storedUsername).single();
     if (profile) {
       setUserId(profile.id);
-      const { data } = await supabase.from('projects').select('*, query_letters(status)').eq('user_id', profile.id).eq('visible', true).order('updated_at', { ascending: false });
+      const { data } = await supabase.from('projects')
+        .select('*, query_letters(id)')
+        .eq('user_id', profile.id)
+        .eq('visible', true)
+        .order('updated_at', { ascending: false });
       if (data) setProjects(data as unknown as Project[]);
     }
     setLoading(false);
@@ -113,50 +102,45 @@ export default function DashboardPage() {
   if (loading) return <div className="p-12 font-serif italic text-[#999]">Reviewing your library...</div>;
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
+    <div className="p-8 max-w-[1600px] mx-auto h-[calc(100vh-4rem)]">
       <header className="flex justify-between items-end mb-12">
         <div>
           <h1 className="text-4xl font-bold text-[#1a1a1a] mb-2 tracking-tight">Your Slush Pile</h1>
           <p className="text-[#5c5c5c] italic text-lg font-serif">"Every great work begins with a single pitch."</p>
         </div>
         <button onClick={createNewProject} className="bg-[#1a1a1a] text-white px-6 py-3 font-sans font-bold uppercase tracking-widest text-xs hover:bg-[#333] transition-all cursor-pointer shadow-sm">
-          New Manuscript
+          New Book
         </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-12">
+      <div className="flex flex-wrap gap-x-16 gap-y-20">
         {projects.map((project) => {
           const statusInfo = PROJECT_STATUS[project.current_stage] || { label: project.current_stage, colorClass: "bg-slate-300" };
-          const counts = (project.query_letters || []).reduce((acc, curr) => {
-            acc[curr.status] = (acc[curr.status] || 0) + 1;
-            return acc;
-          }, {} as Record<string, number>);
-
+          const letterCount = (project.query_letters || []).length;
           const { bg, spine, text, border } = getBookStyles(project.id);
 
           return (
-            <div key={project.id} className="flex items-start group relative">
-              <div className="relative shrink-0">
+            <div key={project.id} className="flex flex-col group relative w-40">
+              <div className="relative mb-5">
                 <div className="absolute top-2 right-2 z-20">
                   <button
                     onClick={(e) => { e.stopPropagation(); setActiveMenu(activeMenu === project.id ? null : project.id); }}
-                    className="p-1 hover:bg-black/5 rounded-full transition-colors cursor-pointer text-black/20 hover:text-black/60 font-sans"
+                    className="p-1 bg-white/50 backdrop-blur-sm hover:bg-white/80 rounded-full transition-colors cursor-pointer text-black/40 hover:text-black/80 font-sans"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                   </button>
 
                   {activeMenu === project.id && (
-                    <div ref={menuRef} className="absolute left-full top-0 ml-1 w-36 bg-white border border-[#dcd6bc] shadow-xl z-30 py-1">
-                      {/* Increased Font Size for Menu Options */}
-                      <button onClick={() => openRenameModal(project)} className="w-full text-left px-4 py-2 text-xs font-sans font-semibold tracking-normal hover:bg-[#f9f8f4] text-[#1a1a1a] cursor-pointer">Rename</button>
-                      <button onClick={() => openDeleteModal(project)} className="w-full text-left px-4 py-2 text-xs font-sans font-semibold tracking-normal hover:bg-red-50 text-red-600 cursor-pointer">Delete</button>
+                    <div ref={menuRef} className="absolute left-full top-0 ml-1 w-32 bg-white border border-[#dcd6bc] shadow-xl z-30 py-1">
+                      <button onClick={() => openRenameModal(project)} className="w-full text-left px-4 py-2 text-[10px] font-sans font-bold uppercase tracking-wider hover:bg-[#f9f8f4] text-[#1a1a1a] cursor-pointer">Rename</button>
+                      <button onClick={() => openDeleteModal(project)} className="w-full text-left px-4 py-2 text-[10px] font-sans font-bold uppercase tracking-wider hover:bg-red-50 text-red-600 cursor-pointer">Delete</button>
                     </div>
                   )}
                 </div>
 
-                <Link href={`/project/${project.id}`} className="relative flex w-40 h-56 transition-transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-lg hover:shadow-2xl">
+                <Link href={`/project/${project.id}`} className="relative flex w-40 h-56 transition-transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer shadow-md hover:shadow-xl">
                   <div className={`relative flex w-full h-full ${bg} ${border} border rounded-r-lg overflow-hidden`}>
-                    <div className={`w-5 h-full ${spine} border-r border-black/5`}></div>
+                    <div className={`w-4 h-full ${spine} border-r border-black/5`}></div>
                     <div className="flex-1 p-3 flex flex-col justify-center">
                       <h3 className={`text-base font-bold leading-tight ${text} line-clamp-5 font-serif italic text-center px-1`}>
                         {project.title}
@@ -166,36 +150,16 @@ export default function DashboardPage() {
                 </Link>
               </div>
 
-              {/* DETAILS COLUMN: matched to height of book (h-56) to align date at bottom */}
-              <div className="flex-1 ml-4 h-56 flex flex-col py-2 relative">
-                <div className="mb-3">
-                  <span className={`${statusInfo.colorClass} text-white text-[10px] font-sans font-bold uppercase tracking-widest px-3 py-1 rounded-sm shadow-sm inline-block w-fit whitespace-normal leading-normal`}>
+              <div className="space-y-2 px-1 flex flex-col items-center text-center">
+                <div>
+                  <span className={`${statusInfo.colorClass} text-white text-[10px] font-sans font-bold uppercase tracking-widest px-2.5 py-1 rounded-sm shadow-sm inline-block w-fit`}>
                     {statusInfo.label}
                   </span>
                 </div>
-
-                <div className="space-y-1 mb-3">
-                  {Object.keys(LETTER_STATUS).map(key => {
-                    const count = counts[key] || 0;
-                    if (count === 0) return null;
-                    return (
-                      <div key={key} className="flex items-center space-x-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${LETTER_STATUS[key].colorClass}`}></span>
-                        {/* Increased Font Size for Letter Count */}
-                        <span className="text-[11px] font-sans font-semibold text-[#555] tracking-normal capitalize">
-                          {count} {LETTER_STATUS[key].label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {(project.query_letters || []).length === 0 && (
-                     <div className="text-[11px] font-sans font-semibold text-[#666]">No letters found</div>
-                  )}
-                </div>
-
-                {/* UPDATE DATE: Pinned to bottom using mt-auto */}
-                <div className="mt-auto text-[11px] text-[#666] font-normal font-sans border-t border-[#eee] pt-1.5">
-                  {formatDate(project.updated_at)}
+                <div className="flex items-center justify-center w-full">
+                  <span className="text-xs font-sans font-bold text-[#444] tracking-tight">
+                    {letterCount} {letterCount === 1 ? 'Letter' : 'Letters'}
+                  </span>
                 </div>
               </div>
             </div>

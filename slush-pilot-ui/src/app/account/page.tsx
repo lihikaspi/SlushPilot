@@ -7,7 +7,6 @@ export default function AccountPage() {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  // State for the notification message
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const [profile, setProfile] = useState({
@@ -51,7 +50,7 @@ export default function AccountPage() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    setNotification(null); // Clear existing notifications
+    setNotification(null);
 
     const { error } = await supabase
       .from('profiles')
@@ -73,7 +72,6 @@ export default function AccountPage() {
 
     setSaving(false);
 
-    // Automatically hide notification after 4 seconds
     setTimeout(() => {
       setNotification(null);
     }, 4000);
@@ -82,8 +80,11 @@ export default function AccountPage() {
   if (loading) return <div className="p-12 font-serif italic text-[#999]">Unrolling parchment...</div>;
 
   return (
-    <div className="p-12 max-w-6xl mx-auto relative">
-      <header className="mb-12 border-b-2 border-[#dcd6bc] pb-6 flex justify-between items-center">
+    // Container aligned with Dashboard: p-8 max-w-[1600px]
+    <div className="p-8 max-w-[1600px] mx-auto relative h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+
+      {/* Header aligned with Dashboard: items-end and mb-12 */}
+      <header className="flex justify-between items-end mb-12 shrink-0">
         <div>
           <h1 className="text-4xl font-bold text-[#1a1a1a] mb-2 tracking-tight">Author Biography</h1>
           <p className="text-[#5c5c5c] italic font-serif text-lg">Personal details used by the Composer to ink your letters.</p>
@@ -92,16 +93,18 @@ export default function AccountPage() {
         <button
           onClick={(e) => handleUpdate(e as any)}
           disabled={saving}
-          className="px-10 py-3 bg-[#1a1a1a] text-white font-sans font-bold uppercase tracking-widest text-xs hover:bg-[#333] shadow-lg disabled:opacity-50 cursor-pointer h-fit transition-all"
+          // Button aligned with Dashboard: px-6 py-3 and shadow-sm
+          className="bg-[#1a1a1a] text-white px-6 py-3 font-sans font-bold uppercase tracking-widest text-xs hover:bg-[#333] transition-all cursor-pointer shadow-sm disabled:opacity-50 h-fit"
         >
           {saving ? 'Inking parchment...' : 'Update Biography'}
         </button>
       </header>
 
-      <form onSubmit={handleUpdate} className="bg-white border border-[#dcd6bc] shadow-sm p-10 space-y-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+      {/* The form content occupies the remaining vertical space */}
+      <form onSubmit={handleUpdate} className="bg-white border border-[#dcd6bc] shadow-sm p-10 space-y-8 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 flex-1 min-h-0">
 
-          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 overflow-y-auto pr-2 scrollbar-thin">
             <div>
               <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Legal Name / Nom de Plume *</label>
               <input
@@ -166,19 +169,19 @@ export default function AccountPage() {
             </div>
           </div>
 
-          <div className="lg:col-span-1 flex flex-col">
+          <div className="lg:col-span-1 flex flex-col h-full">
             <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-[#999] mb-2">Author Background</label>
             <textarea
               value={profile.bio}
               onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-              className="flex-1 w-full p-4 border border-[#eee] focus:border-[#1a1a1a] outline-none bg-[#fafafa] font-serif italic text-sm leading-relaxed min-h-[300px]"
+              className="flex-1 w-full p-4 border border-[#eee] focus:border-[#1a1a1a] outline-none bg-[#fafafa] font-serif italic text-sm leading-relaxed resize-none"
               placeholder="Describe your writing history, accolades, or specific tone..."
             />
           </div>
         </div>
       </form>
 
-      {/* Toast Notification Container */}
+      {/* Notifications remain at the bottom right */}
       {notification && (
         <div className="fixed bottom-8 right-8 z-[100] animate-in slide-in-from-right-full fade-in duration-300">
           <div className={`px-6 py-4 shadow-2xl border flex items-center gap-3 rounded-sm ${
@@ -186,7 +189,6 @@ export default function AccountPage() {
               ? 'bg-emerald-600 border-emerald-500 text-white' 
               : 'bg-rose-600 border-rose-500 text-white'
           }`}>
-            {/* Status Icon */}
             <div className="w-5 h-5 flex items-center justify-center bg-white/20 rounded-full">
               {notification.type === 'success' ? (
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -198,7 +200,6 @@ export default function AccountPage() {
                 </svg>
               )}
             </div>
-
             <p className="font-sans font-bold text-xs uppercase tracking-widest">
               {notification.text}
             </p>
