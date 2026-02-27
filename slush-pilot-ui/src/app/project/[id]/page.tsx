@@ -5,11 +5,8 @@ import { createClient } from '@/src/utils/supabase/client';
 
 const PROJECT_STATUS: Record<string, { label: string; colorClass: string }> = {
   new: { label: "New Project", colorClass: "bg-gray-400" },
-  missing_info: { label: "Missing Information", colorClass: "bg-gray-400" },
-  publisher_search: { label: "Publisher Search", colorClass: "bg-amber-500" },
-  drafting: { label: "Drafting Letters", colorClass: "bg-blue-500" },
-  sent: { label: "Letters Sent", colorClass: "bg-emerald-600" },
-  respond: { label: "Response Received", colorClass: "bg-rose-600" }
+  publisher_search: { label: "Publisher Search", colorClass: "bg-sky-600" },
+  drafting: { label: "Drafting Letters", colorClass: "bg-emerald-600" }
 };
 
 interface Message {

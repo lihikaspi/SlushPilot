@@ -16,11 +16,8 @@ ARCHITECTURE_IMAGE = "images/SlushPilot.png"
 
 PROJECT_STATUS = {
     "new": {"label": "New Project", "color": "gray"},
-    "missing_info": {"label": "Missing Information", "color": "gray"},
     "publisher_search" : {"label": "Publisher Search", "color": "yellow"},
-    "drafting": {"label": "Drafting Letters", "color": "blue"},
-    "sent": {"label": "Letters Sent", "color": "green"},
-    "respond": {"label": "Response Received", "color": "red"}
+    "drafting": {"label": "Letter Writing", "color": "blue"}
 }
 
 LETTER_STATUS = {

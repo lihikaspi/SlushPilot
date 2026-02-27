@@ -7,11 +7,8 @@ import { useRouter } from 'next/navigation';
 
 const PROJECT_STATUS: Record<string, { label: string; colorClass: string }> = {
   new: { label: "New Project", colorClass: "bg-gray-400" },
-  missing_info: { label: "Missing Information", colorClass: "bg-gray-400" },
-  publisher_search: { label: "Publisher Search", colorClass: "bg-amber-500" },
-  drafting: { label: "Drafting Letters", colorClass: "bg-blue-500" },
-  sent: { label: "Letters Sent", colorClass: "bg-emerald-600" },
-  respond: { label: "Response Received", colorClass: "bg-rose-600" }
+  publisher_search: { label: "Publisher Search", colorClass: "bg-sky-600" },
+  drafting: { label: "Drafting Letters", colorClass: "bg-emerald-600" }
 };
 
 interface Project {
@@ -32,9 +29,10 @@ export default function DashboardPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [modalType, setModalType] = useState<'rename' | 'delete' | null>(null);
+  const [modalType, setModalType] = useState<'rename' | 'delete' | 'status' | null>(null);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [statusValue, setStatusValue] = useState('');
 
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +45,8 @@ export default function DashboardPage() {
       { bg: 'bg-purple-600/10', spine: 'bg-purple-600/30', text: 'text-purple-900', border: 'border-purple-600/20' },
       { bg: 'bg-teal-600/10', spine: 'bg-teal-600/30', text: 'text-teal-900', border: 'border-teal-600/20' },
     ];
-    let hash = 0;    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+    let hash = 0;
+    for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
     return bookColors[Math.abs(hash) % bookColors.length];
   };
 
@@ -77,11 +76,19 @@ export default function DashboardPage() {
 
   const openRenameModal = (project: Project) => { setSelectedProject(project); setRenameValue(project.title); setModalType('rename'); setActiveMenu(null); };
   const openDeleteModal = (project: Project) => { setSelectedProject(project); setModalType('delete'); setActiveMenu(null); };
-  const closeModal = () => { setModalType(null); setSelectedProject(null); setRenameValue(''); };
+  const openStatusModal = (project: Project) => { setSelectedProject(project); setStatusValue(project.current_stage); setModalType('status'); setActiveMenu(null); };
+  const closeModal = () => { setModalType(null); setSelectedProject(null); setRenameValue(''); setStatusValue(''); };
 
   const confirmRename = async () => {
     if (!selectedProject || !renameValue.trim()) return;
     await supabase.from('projects').update({ title: renameValue.trim(), updated_at: new Date().toISOString() }).eq('id', selectedProject.id);
+    fetchDashboardData();
+    closeModal();
+  };
+
+  const confirmStatusChange = async () => {
+    if (!selectedProject || !statusValue) return;
+    await supabase.from('projects').update({ current_stage: statusValue, updated_at: new Date().toISOString() }).eq('id', selectedProject.id);
     fetchDashboardData();
     closeModal();
   };
@@ -102,7 +109,7 @@ export default function DashboardPage() {
   if (loading) return <div className="p-12 font-serif italic text-[#999]">Reviewing your library...</div>;
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto h-[calc(100vh-4rem)]">
+    <div className="p-8 max-w-[1600px] mx-auto min-h-screen">
       <header className="flex justify-between items-end mb-12">
         <div>
           <h1 className="text-4xl font-bold text-[#1a1a1a] mb-2 tracking-tight">Your Slush Pile</h1>
@@ -133,6 +140,7 @@ export default function DashboardPage() {
                   {activeMenu === project.id && (
                     <div ref={menuRef} className="absolute left-full top-0 ml-1 w-32 bg-white border border-[#dcd6bc] shadow-xl z-30 py-1">
                       <button onClick={() => openRenameModal(project)} className="w-full text-left px-4 py-2 text-[10px] font-sans font-bold uppercase tracking-wider hover:bg-[#f9f8f4] text-[#1a1a1a] cursor-pointer">Rename</button>
+                      <button onClick={() => openStatusModal(project)} className="w-full text-left px-4 py-2 text-[10px] font-sans font-bold uppercase tracking-wider hover:bg-[#f9f8f4] text-[#1a1a1a] cursor-pointer">Change Status</button>
                       <button onClick={() => openDeleteModal(project)} className="w-full text-left px-4 py-2 text-[10px] font-sans font-bold uppercase tracking-wider hover:bg-red-50 text-red-600 cursor-pointer">Delete</button>
                     </div>
                   )}
@@ -176,6 +184,25 @@ export default function DashboardPage() {
                 <input type="text" value={renameValue} onChange={(e) => setRenameValue(e.target.value)} className="w-full bg-white border border-[#dcd6bc] p-3 font-serif text-sm outline-none focus:border-[#1a1a1a] mb-8" placeholder="New Title..." autoFocus />
                 <div className="flex space-x-4">
                   <button onClick={confirmRename} className="flex-1 bg-[#1a1a1a] text-white py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#333] cursor-pointer">Update Title</button>
+                  <button onClick={closeModal} className="flex-1 border border-[#dcd6bc] text-[#666] py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#f9f8f4] cursor-pointer">Cancel</button>
+                </div>
+              </>
+            ) : modalType === 'status' ? (
+              <>
+                <h2 className="text-xs font-sans font-bold uppercase tracking-widest text-[#999] mb-6">Change Project Status</h2>
+                <div className="space-y-3 mb-8 max-h-60 overflow-y-auto pr-2 scrollbar-thin">
+                  {Object.entries(PROJECT_STATUS).map(([key, info]) => (
+                    <button
+                      key={key}
+                      onClick={() => setStatusValue(key)}
+                      className={`w-full p-4 rounded-sm transition-all flex items-center justify-center cursor-pointer shadow-sm ${info.colorClass} ${statusValue === key ? 'ring-2 ring-black ring-offset-2' : 'hover:brightness-95'}`}
+                    >
+                      <span className="text-[10px] font-sans font-bold uppercase tracking-widest text-white">{info.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex space-x-4">
+                  <button onClick={confirmStatusChange} className="flex-1 bg-[#1a1a1a] text-white py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#333] cursor-pointer">Update Status</button>
                   <button onClick={closeModal} className="flex-1 border border-[#dcd6bc] text-[#666] py-3 text-[10px] font-sans font-bold uppercase tracking-widest hover:bg-[#f9f8f4] cursor-pointer">Cancel</button>
                 </div>
               </>
