@@ -13,17 +13,3 @@ CHAT_MODEL = "RPRTHPB-gpt-5-mini"
 EMBED_MODEL = "RPRTHPB-text-embedding-3-small"
 
 ARCHITECTURE_IMAGE = "images/SlushPilot.png"
-
-PROJECT_STATUS = {
-    "new": {"label": "New Project", "color": "gray"},
-    "publisher_search" : {"label": "Publisher Search", "color": "yellow"},
-    "drafting": {"label": "Letter Writing", "color": "blue"}
-}
-
-LETTER_STATUS = {
-    "new": {"label": "New Letter/Unwritten", "color": "gray"},
-    "draft": {"label": "Drafted", "color": "blue"},
-    "sent": {"label": "Sent", "color": "green"},
-    "respond": {"label": "Response Received", "color": "red"},
-    "rejected": {"label": "Rejected", "color": "black"}
-}
