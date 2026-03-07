@@ -2,3 +2,4 @@
 .venv
 .idea
 .next
+.__pycache__
