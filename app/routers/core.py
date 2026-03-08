@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from fastapi.responses import FileResponse
 
 import config
+from app.agents.clarify import generate_clarification
 from app.agents.composer import compose_query_letters
 from app.services.supabase_client import get_supabase_client
 from app.agents.intake import parse_intake
@@ -261,9 +262,28 @@ async def execute_agent(payload: ExecuteRequest) -> ExecuteResponse:
     steps_trace: list[Step] = []
 
     try:
+        # ── 0. CONTEXT: gather previous inputs from this iteration ──
+        full_prompt = payload.prompt
+        try:
+            supabase = get_supabase_client()
+            prev_steps = (
+                supabase.table("steps")
+                .select("input")
+                .eq("user", payload.user_id)
+                .eq("iteration", payload.iteration)
+                .order("message", desc=False)
+                .execute()
+            )
+            if prev_steps.data:
+                previous_inputs = [s["input"] for s in prev_steps.data]
+                previous_inputs.append(payload.prompt)
+                full_prompt = "\n\n".join(previous_inputs)
+        except Exception:
+            logger.debug("Could not fetch previous steps, using current prompt only")
+
         # ── 1. INTAKE: parse prompt into structured fields ──
         t0 = time.time()
-        parsed, intake_trace = parse_intake(payload.prompt, return_trace=True)
+        parsed, intake_trace = parse_intake(full_prompt, return_trace=True)
         logger.info("Execute: intake completed in %.1fs", time.time() - t0)
 
         steps_trace.append(Step(
@@ -286,18 +306,40 @@ async def execute_agent(payload: ExecuteRequest) -> ExecuteResponse:
         if not composer_data.get("summary") and strategist_data.get("blurb"):
             composer_data["summary"] = strategist_data["blurb"]
 
-        # Validate minimum required fields for strategist
-        required_strategist = ["title", "genre", "blurb"]
-        missing = [f for f in required_strategist if not strategist_data.get(f)]
+        # Validate all required fields (same checks as the graph)
+        missing = []
+        if not (strategist_data.get("title") or "").strip():
+            missing.append("strategist.title")
+        if not (strategist_data.get("genre") or "").strip():
+            missing.append("strategist.genre")
+        if not (strategist_data.get("blurb") or "").strip():
+            missing.append("strategist.blurb")
+        if (strategist_data.get("word_count") or 0) <= 0 and (composer_data.get("word_count") or 0) <= 0:
+            missing.append("strategist.word_count")
+        if not strategist_data.get("comparative_titles"):
+            missing.append("strategist.comparative_titles")
+        if not (strategist_data.get("target_audience") or "").strip():
+            missing.append("strategist.target_audience")
+        if not (composer_data.get("author_name") or "").strip():
+            missing.append("composer.author_name")
+        author_bio = (composer_data.get("author_bio") or "").strip()
+        if not author_bio or len(author_bio) < 30:
+            missing.append("composer.author_bio")
+
         if missing:
+            clarification = generate_clarification(missing)
+            response_text = clarification
+            _persist_execution(
+                payload.user_id, payload.iteration, payload.prompt,
+                steps_trace, response_text,
+            )
             return ExecuteResponse(
-                status="error",
-                error=f"Missing required fields after intake: {', '.join(missing)}. "
-                      "Please provide them in the prompt.",
+                status="clarification",
+                response=clarification,
                 steps=steps_trace,
             )
 
-        # Ensure defaults
+        # Ensure defaults for optional fields that passed validation
         if not strategist_data.get("word_count"):
             strategist_data["word_count"] = composer_data.get("word_count", 0)
         if not strategist_data.get("comparative_titles"):

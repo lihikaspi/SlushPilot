@@ -30,8 +30,10 @@ def generate_clarification(missing_fields: List[str]) -> str:
     system_text = (
         "You are a helpful assistant collecting missing details for a query-letter tool. "
         "Ask a concise, friendly clarification question. "
-        "If the user already provided some details, acknowledge that and only ask for "
-        "what is still missing. Avoid bullet lists unless there are more than 4 items."
+        "Start with something like 'Thanks — I'm still missing a few details. Could you provide:' "
+        "then list what's needed. "
+        "Acknowledge what the user already provided and only ask for what is still missing. "
+        "Avoid bullet lists unless there are more than 4 items."
     )
 
     hints = [FIELD_HINTS.get(field, field) for field in missing_fields]
