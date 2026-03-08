@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { User, MessageSquare, History, ScrollText, Play, Loader2, PlusCircle, Save } from 'lucide-react';
+import { User, MessageSquare, History, ScrollText, Loader2, Save } from 'lucide-react';
 
 // Supabase Configuration
 const supabase = createClient(
@@ -12,49 +12,46 @@ const supabase = createClient(
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 const USER_ID = 1;
-const PROFILE_ID = '73980916-20ef-4cf3-b81a-eb261664d1fd'; // liorza profile for messages FK
-const ITERATION_ID = 1;
-const PROJECT_ID = 'e4d6811b-5b85-4ac4-b856-dd6c75ad0bd5';
-
-interface Message {
-  id: string;
-  role: 'user' | 'model';
-  content: string;
-  chat_message_id: number;
-}
 
 export default function SlushPilot() {
   const [activeTab, setActiveTab] = useState('chat');
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<any>(null);
+  const [iterationId, setIterationId] = useState<number | null>(null);
 
   // States aligned with DB schemas
   const [userInfo, setUserInfo] = useState({
     name: '', email: '', phone: '', city: '', country: '', bio: ''
   });
-  const [messages, setMessages] = useState<Message[]>([]);
   const [dbSteps, setDbSteps] = useState<any[]>([]);
   const [letters, setLetters] = useState<any[]>([]);
 
-  // Convert messages into paired input/response format for display
-  const chatPairs = React.useMemo(() => {
-    const pairs: { input: string; response: string }[] = [];
-    for (let i = 0; i < messages.length; i++) {
-      if (messages[i].role === 'user') {
-        const response = messages[i + 1]?.role === 'model' ? messages[i + 1].content : '';
-        pairs.push({ input: messages[i].content, response });
-        if (response) i++; // skip the model message we just consumed
-      }
-    }
-    return pairs;
-  }, [messages]);
+  // Fetch steps and letters for the current iteration
+  const fetchIterationData = async (iterId: number) => {
+    const [stepsRes, lettersRes] = await Promise.all([
+      supabase
+        .from('steps')
+        .select('*')
+        .eq('user', USER_ID)
+        .eq('iteration', iterId)
+        .order('message', { ascending: true }),
+      supabase
+        .from('letters')
+        .select('*')
+        .eq('user', USER_ID)
+        .eq('iteration', iterId)
+        .order('created_at', { ascending: false }),
+    ]);
+    if (stepsRes.data) setDbSteps(stepsRes.data);
+    if (lettersRes.data) setLetters(lettersRes.data);
+  };
 
-  // Fetch data exclusively from DB for User 1, Iteration 1
+  // Load user info and latest iteration on mount
   const fetchData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch from public.users
+      // Fetch user profile
       const { data: user } = await supabase
         .from('users')
         .select('*')
@@ -62,30 +59,30 @@ export default function SlushPilot() {
         .single();
       if (user) setUserInfo(user);
 
-      // 2. Fetch chat messages
-      const { data: msgs } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('project_id', PROJECT_ID)
-        .order('chat_message_id', { ascending: true });
-      if (msgs) setMessages(msgs);
-
-      // 3. Fetch from public.steps for current iteration
-      const { data: steps } = await supabase
-        .from('steps')
+      // Fetch latest iteration for this user
+      const { data: iterations } = await supabase
+        .from('iterations')
         .select('*')
         .eq('user', USER_ID)
-        .eq('iteration', ITERATION_ID)
-        .order('message', { ascending: true });
-      if (steps) setDbSteps(steps);
+        .order('id', { ascending: false })
+        .limit(1);
 
-      // 4. Fetch from query_letters
-      const { data: qLetters } = await supabase
-        .from('query_letters')
-        .select('id, publisher, content, updated_at')
-        .eq('project_id', PROJECT_ID)
-        .order('updated_at', { ascending: false });
-      if (qLetters) setLetters(qLetters);
+      let currentIteration: number;
+      if (iterations && iterations.length > 0) {
+        currentIteration = iterations[0].id;
+      } else {
+        // No iterations exist — create the first one
+        const res = await fetch(`${BACKEND_URL}/api/new_iteration`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: USER_ID }),
+        });
+        const result = await res.json();
+        currentIteration = result.iteration_id;
+      }
+
+      setIterationId(currentIteration);
+      await fetchIterationData(currentIteration);
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
@@ -106,78 +103,50 @@ export default function SlushPilot() {
     if (!error) alert("Author profile updated successfully.");
   };
 
+  const handleNewConversation = async () => {
+    if (!confirm("Start a new conversation? This will start a fresh iteration.")) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/new_iteration`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: USER_ID }),
+      });
+      const result = await res.json();
+      setIterationId(result.iteration_id);
+      setDbSteps([]);
+      setLetters([]);
+      setSelectedLetter(null);
+    } catch (err) {
+      console.error('New iteration error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRunAgent = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || iterationId === null) return;
     setLoading(true);
     const userMessage = input.trim();
-    const nextId = messages.length > 0 ? Math.max(...messages.map(m => m.chat_message_id)) + 1 : 0;
-
-    // Save user message to Supabase
-    const { data } = await supabase
-      .from('messages')
-      .insert({
-        project_id: PROJECT_ID,
-        user_id: PROFILE_ID,
-        role: 'user',
-        content: userMessage,
-        chat_message_id: nextId,
-      })
-      .select()
-      .single();
-
-    if (!data) { setLoading(false); return; }
-    setMessages(prev => [...prev, data]);
     setInput('');
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/chat`, {
+      const response = await fetch(`${BACKEND_URL}/api/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project_id: PROJECT_ID, user_message: userMessage }),
+        body: JSON.stringify({
+          prompt: userMessage,
+          user_id: USER_ID,
+          iteration: iterationId,
+        }),
       });
 
       if (!response.ok) throw new Error(`Backend error: ${response.status}`);
-      const result = await response.json();
 
-      // Save assistant response
-      if (result.assistant_message) {
-        const { data: aiData } = await supabase
-          .from('messages')
-          .insert({
-            project_id: PROJECT_ID,
-            user_id: PROFILE_ID,
-            role: 'model',
-            content: result.assistant_message,
-            chat_message_id: nextId + 1,
-          })
-          .select()
-          .single();
-        if (aiData) setMessages(prev => [...prev, aiData]);
-      }
-
-      // Refresh letters if any were generated
-      if (result.letters_saved && result.letters_saved.length > 0) {
-        const { data: qLetters } = await supabase
-          .from('query_letters')
-          .select('id, publisher, content, updated_at')
-          .eq('project_id', PROJECT_ID)
-          .order('updated_at', { ascending: false });
-        if (qLetters) setLetters(qLetters);
-      }
+      // Refresh steps and letters from DB
+      await fetchIterationData(iterationId);
     } catch (err) {
-      console.error('Chat error:', err);
-      const { data: errData } = await supabase
-        .from('messages')
-        .insert({
-          project_id: PROJECT_ID,
-          user_id: PROFILE_ID,
-          role: 'model',
-          content: "I'm sorry, something went wrong. Please try again.",
-          chat_message_id: nextId + 1,
-        })
-        .select()
-        .single();
-      if (errData) setMessages(prev => [...prev, errData]);
+      console.error('Execute error:', err);
     } finally {
       setLoading(false);
     }
@@ -187,7 +156,6 @@ export default function SlushPilot() {
   const formatJsonRaw = (val: any) => {
     if (!val) return "No trace data available.";
     const str = JSON.stringify(val, null, 2);
-    // Regex removes the first '{' or '[' and the last '}' or ']'
     return str.replace(/^[\{\[]|[\}\]]$/g, '').trim();
   };
 
@@ -199,26 +167,34 @@ export default function SlushPilot() {
           <h1 className="text-2xl font-bold tracking-tighter uppercase border-b-2 border-ink pb-2">Slush Pilot</h1>
         </div>
         <nav className="space-y-4 flex-1">
-          <NavBtn icon={<MessageSquare size={18}/>} label="Chat" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
+          <NavBtn icon={<MessageSquare size={18}/>} label="Run Agent" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
           <NavBtn icon={<User size={18}/>} label="Personal Info" active={activeTab === 'info'} onClick={() => setActiveTab('info')} />
           <NavBtn icon={<History size={18}/>} label="Steps Trace" active={activeTab === 'trace'} onClick={() => setActiveTab('trace')} />
           <NavBtn icon={<ScrollText size={18}/>} label="Letters" active={activeTab === 'letters'} onClick={() => setActiveTab('letters')} />
         </nav>
+        {iterationId !== null && (
+          <p className="text-[10px] uppercase tracking-widest text-manuscript-gray mb-2 text-center">
+            Iteration #{iterationId}
+          </p>
+        )}
+        <button onClick={handleNewConversation} className="mt-2 border border-binding-gold px-4 py-2 hover:bg-binding-gold transition-colors uppercase text-xs font-bold tracking-widest cursor-pointer">
+          New Conversation
+        </button>
       </aside>
 
       <main className="flex-1 overflow-hidden flex flex-col relative">
-        {/* CHAT TAB */}
+        {/* RUN AGENT TAB */}
         {activeTab === 'chat' && (
           <div className="flex-1 flex flex-col p-8 max-w-3xl mx-auto w-full relative overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-6 pr-4 z-10 min-h-0">
-              {chatPairs.length === 0 && !loading && (
+              {dbSteps.length === 0 && !loading && (
                 <div className="flex justify-start">
                   <div className="max-w-[80%] p-4 rounded shadow-sm border bg-white border-binding-gold">
-                    <p>Hi! What can I help you publish today?</p>
+                    <p>Hi! Describe your manuscript and I'll find matching publishers and draft query letters.</p>
                   </div>
                 </div>
               )}
-              {chatPairs.map((row, i) => (
+              {dbSteps.map((row, i) => (
                 <div key={i} className="space-y-4">
                   <div className="flex justify-end">
                     <div className="max-w-[80%] p-4 rounded shadow-sm border bg-binding-gold border-ink">
@@ -228,7 +204,7 @@ export default function SlushPilot() {
                   {row.response && (
                     <div className="flex justify-start">
                       <div className="max-w-[80%] p-4 rounded shadow-sm border bg-white border-binding-gold">
-                        <p>{row.response}</p>
+                        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{row.response}</pre>
                       </div>
                     </div>
                   )}
@@ -239,12 +215,12 @@ export default function SlushPilot() {
             <div className="mt-6 flex gap-3 bg-white p-2 border border-binding-gold shadow-inner z-10">
               <input
                 className="flex-1 bg-transparent outline-none px-2 py-2 font-sans"
-                placeholder="Talk to the agent..."
+                placeholder="Describe your manuscript..."
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRunAgent()}
               />
-              <button onClick={handleRunAgent} className="bg-ink text-parchment px-4 py-2 hover:bg-manuscript-gray uppercase text-xs font-bold tracking-widest cursor-pointer">
+              <button onClick={handleRunAgent} className="bg-binding-gold text-ink px-4 py-2 hover:bg-ink hover:text-parchment border border-ink uppercase text-xs font-bold tracking-widest cursor-pointer">
                 Run Agent
               </button>
             </div>
@@ -282,10 +258,10 @@ export default function SlushPilot() {
           </div>
         )}
 
-        {/* STEPS TRACE TAB - Mirrors Chat layout, shows 'steps' jsonb, no input box */}
+        {/* STEPS TRACE TAB */}
         {activeTab === 'trace' && (
           <div className="flex-1 flex flex-col p-8 max-w-3xl mx-auto w-full relative">
-            <h2 className="text-3xl font-bold mb-8 underline decoration-binding-gold underline-offset-8">Iteration {ITERATION_ID} Trace</h2>
+            <h2 className="text-3xl font-bold mb-8 underline decoration-binding-gold underline-offset-8">Iteration {iterationId} Trace</h2>
             <div className="flex-1 overflow-y-auto space-y-6 pr-4 z-10">
               {dbSteps.map((row, i) => (
                 <div key={i} className="space-y-4">
@@ -315,7 +291,7 @@ export default function SlushPilot() {
         {/* LETTERS TAB */}
         {activeTab === 'letters' && (
           <div className="p-12 h-full overflow-hidden flex flex-col">
-            <h2 className="text-3xl font-bold mb-8 underline decoration-binding-gold underline-offset-8">Iteration {ITERATION_ID} Letters</h2>
+            <h2 className="text-3xl font-bold mb-8 underline decoration-binding-gold underline-offset-8">Iteration {iterationId} Letters</h2>
             <div className="flex gap-8 flex-1 overflow-hidden">
               <div className="w-1/3 space-y-4 overflow-y-auto">
                 {letters.map((letter) => (
@@ -325,7 +301,7 @@ export default function SlushPilot() {
                     onClick={() => setSelectedLetter(letter)}
                   >
                     <h3 className="font-bold text-sm uppercase tracking-wider">{letter.publisher}</h3>
-                    <p className="text-[10px] text-manuscript-gray mt-1">{new Date(letter.updated_at).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-manuscript-gray mt-1">{new Date(letter.created_at).toLocaleDateString()}</p>
                   </div>
                 ))}
               </div>

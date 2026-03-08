@@ -99,8 +99,9 @@ def load_fewshot_examples() -> List[str]:
     if not base_dir.exists():
         raise FileNotFoundError(f"Missing composer letters directory: {base_dir}")
     examples: List[str] = []
+    skip = {"emily_krempholtz_query_letter"}
     for folder in sorted(base_dir.iterdir()):
-        if not folder.is_dir():
+        if not folder.is_dir() or folder.name in skip:
             continue
         modified_path = folder / "modified"
         if modified_path.exists():
@@ -421,8 +422,10 @@ def generate_query_letter(
     )
     response = model.invoke(messages)
     raw = response.content.strip()
+    import re
+    cleaned = re.sub(r',\s*([}\]])', r'\1', raw)
     try:
-        data = json.loads(raw)
+        data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Model did not return valid JSON: {exc}") from exc
 
@@ -440,6 +443,7 @@ def generate_query_letters_batch(
     manuscript: Manuscript,
     publishers: List[Publisher],
     options: ComposerOptions,
+    trace_log: list = None,
 ) -> List[tuple[Publisher, QueryLetterSections]]:
     temperature = 0
     if "gpt-5" in (config.CHAT_MODEL or "").lower():
@@ -452,8 +456,20 @@ def generate_query_letters_batch(
     )
     response = model.invoke(messages)
     raw = response.content.strip()
+
+    if trace_log is not None:
+        system_content = messages[0].content if messages else ""
+        user_content = messages[1].content if len(messages) > 1 else ""
+        trace_log.append({
+            "system": system_content,
+            "user": user_content,
+            "response": raw,
+        })
+
+    import re
+    cleaned = re.sub(r',\s*([}\]])', r'\1', raw)
     try:
-        data = json.loads(raw)
+        data = json.loads(cleaned)
     except json.JSONDecodeError as exc:
         raise ValueError(f"Model did not return valid JSON: {exc}") from exc
 
@@ -479,7 +495,9 @@ def generate_query_letters_batch(
     return results
 
 
-def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
+def compose_query_letters(
+    payload: ComposerRequest, trace_log: list = None,
+) -> ComposerResponse:
     if not payload.publishers:
         raise ValueError("publishers list cannot be empty")
 
@@ -514,6 +532,7 @@ def compose_query_letters(payload: ComposerRequest) -> ComposerResponse:
             manuscript=payload.manuscript,
             publishers=payload.publishers,
             options=payload.options,
+            trace_log=trace_log,
         )
         letters_by_publisher = {
             publisher.name: render_query_letter(

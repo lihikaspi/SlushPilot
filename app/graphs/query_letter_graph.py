@@ -11,7 +11,6 @@ except ImportError:  # pragma: no cover - optional dependency
 import config
 from app.agents.clarify import generate_clarification
 from app.agents.composer import compose_query_letters
-from app.agents.confirm import parse_confirmation
 from app.agents.intake import parse_intake
 from app.agents.strategist import (
     StrategistManuscript,
@@ -39,8 +38,6 @@ class QueryLetterState(TypedDict, total=False):
     missing_fields: List[str]
     errors: List[str]
     next_step: str
-    await_confirmation: bool
-    publisher_confirmation: Optional[bool]
     bio_clarified: bool
 
 
@@ -139,9 +136,6 @@ def _supervisor_node(state: QueryLetterState) -> dict:
     if errors:
         return {"errors": errors, "next_step": "end"}
 
-    if state.get("await_confirmation") and state.get("user_message"):
-        return {"next_step": "confirm"}
-
     if state.get("user_message"):
         return {"next_step": "intake"}
 
@@ -177,12 +171,6 @@ def _supervisor_node(state: QueryLetterState) -> dict:
             "missing_fields": [],
             "next_step": "strategist",
         }
-
-    if state.get("await_confirmation") and state.get("publisher_confirmation") is None:
-        return {**base, "next_step": "end"}
-
-    if state.get("publisher_confirmation") is False:
-        return {**base, "next_step": "end"}
 
     bio_clarified = state.get("bio_clarified", False)
     missing_fields = _missing_composer_fields(composer_data, bio_clarified=bio_clarified)
@@ -231,19 +219,12 @@ def _strategist_node(state: QueryLetterState) -> dict:
         Publisher(name=entry.publisher_name or entry.publisher_id, comps=entry.comps)
         for entry in results
     ]
-    assistant_message = (
-        "I found these publishers that look like a good fit:\n\n"
-        f"{_format_publishers(publishers)}\n\n"
-        "Would you like me to draft query letters for them?"
-    )
     if os.getenv("DEBUG_INTAKE") == "1":
-        print("Strategist assistant_message length:", len(assistant_message))
+        print("Strategist found publishers:", [p.name for p in publishers])
     return {
         "publishers": publishers,
         "strategist_input": strategist_input,
-        "assistant_message": assistant_message,
-        "await_confirmation": True,
-        "publisher_confirmation": None,
+        "assistant_message": "",
     }
 
 
@@ -293,43 +274,6 @@ def _intake_node(state: QueryLetterState) -> dict:
     }
 
 
-def _confirm_node(state: QueryLetterState) -> dict:
-    user_message = (state.get("user_message") or "").strip()
-    decision = parse_confirmation(user_message)
-    if decision is None:
-        return {
-            "assistant_message": (
-                "Would you like me to draft query letters for the publishers I found? "
-                "Please reply with yes or no."
-            ),
-            "user_message": "",
-            "await_confirmation": True,
-            "publisher_confirmation": None,
-            "strategist_data": state.get("strategist_data"),
-            "composer_data": state.get("composer_data"),
-            "publishers": state.get("publishers"),
-        }
-    if decision is False:
-        return {
-            "assistant_message": "Got it. Let me know if you want to continue later.",
-            "user_message": "",
-            "await_confirmation": False,
-            "publisher_confirmation": False,
-            "strategist_data": state.get("strategist_data"),
-            "composer_data": state.get("composer_data"),
-            "publishers": state.get("publishers"),
-        }
-    return {
-        "assistant_message": "",
-        "user_message": "",
-        "await_confirmation": False,
-        "publisher_confirmation": True,
-        "strategist_data": state.get("strategist_data"),
-        "composer_data": state.get("composer_data"),
-        "publishers": state.get("publishers"),
-    }
-
-
 def _clarify_node(state: QueryLetterState) -> dict:
     missing_fields = state.get("missing_fields") or []
     if not missing_fields:
@@ -369,7 +313,6 @@ def build_query_letter_graph():
     graph.add_node("strategist", _strategist_node)
     graph.add_node("composer", _composer_node)
     graph.add_node("clarify", _clarify_node)
-    graph.add_node("confirm", _confirm_node)
 
     graph.set_entry_point("supervisor")
     graph.add_conditional_edges(
@@ -380,13 +323,11 @@ def build_query_letter_graph():
             "clarify": "clarify",
             "strategist": "strategist",
             "composer": "composer",
-            "confirm": "confirm",
             "end": END,
         },
     )
     graph.add_edge("intake", "supervisor")
-    graph.add_edge("strategist", END)
+    graph.add_edge("strategist", "supervisor")
     graph.add_edge("composer", "supervisor")
-    graph.add_edge("confirm", "supervisor")
     graph.add_edge("clarify", END)
     return graph.compile()

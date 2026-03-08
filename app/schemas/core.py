@@ -22,6 +22,8 @@ class Step(BaseModel):
 
 class ExecuteRequest(BaseModel):
     prompt: str
+    user_id: int = 1
+    iteration: int = 1
 
 
 class ExecuteResponse(BaseModel):

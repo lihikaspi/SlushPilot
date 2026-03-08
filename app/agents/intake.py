@@ -33,7 +33,11 @@ class IntakeResult(BaseModel):
     missing_fields: List[str] = Field(default_factory=list)
 
 
-def parse_intake(user_message: str, missing_fields: Optional[List[str]] = None) -> IntakeResult:
+def parse_intake(
+    user_message: str,
+    missing_fields: Optional[List[str]] = None,
+    return_trace: bool = False,
+) -> IntakeResult:
     if not config.OPENAI_API_KEY:
         raise ValueError("Missing OPENAI_API_KEY")
 
@@ -73,4 +77,11 @@ def parse_intake(user_message: str, missing_fields: Optional[List[str]] = None) 
     if os.getenv("DEBUG_INTAKE") == "1":
         print("Intake parsed JSON:")
         print(parsed.model_dump())
+    if return_trace:
+        trace = {
+            "system": system_text,
+            "user": user_text,
+            "response": parsed.model_dump(),
+        }
+        return parsed, trace
     return parsed

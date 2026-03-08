@@ -153,3 +153,30 @@ async def chat(payload: ChatRequest) -> ChatResponse:
         letters_saved=letters_saved,
         current_step=final_state.get("next_step", ""),
     )
+
+
+class ResetRequest(BaseModel):
+    project_id: str
+
+
+@router.post("/api/reset")
+async def reset_conversation(payload: ResetRequest):
+    """Clear graph state, messages, and letters for a project."""
+    supabase = get_supabase_client()
+    supabase.table("projects").update({"graph_state": None}).eq("id", payload.project_id).execute()
+    supabase.table("messages").delete().eq("project_id", payload.project_id).execute()
+    supabase.table("query_letters").delete().eq("project_id", payload.project_id).execute()
+    return {"status": "ok"}
+
+
+class NewIterationRequest(BaseModel):
+    user_id: int = 1
+
+
+@router.post("/api/new_iteration")
+async def new_iteration(payload: NewIterationRequest):
+    """Create a new iteration for the given user."""
+    supabase = get_supabase_client()
+    result = supabase.table("iterations").insert({"user": payload.user_id}).execute()
+    new_id = result.data[0]["id"]
+    return {"iteration_id": new_id}

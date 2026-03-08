@@ -51,8 +51,11 @@ def create_strategist_service() -> StrategistService:
 
 
 def formulate_queries(
-    service: StrategistService, manuscript: StrategistManuscript
+    service: StrategistService,
+    manuscript: StrategistManuscript,
+    return_trace: bool = False,
 ) -> HybridSearchQueries:
+    system_text = "You are an expert literary agent AI configuring a database search."
     prompt = (
         "Analyze this manuscript profile and generate search queries for our "
         "publisher database.\n"
@@ -64,17 +67,20 @@ def formulate_queries(
     response = service.client.beta.chat.completions.parse(
         model=service.chat_model,
         messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are an expert literary agent AI configuring a database search."
-                ),
-            },
+            {"role": "system", "content": system_text},
             {"role": "user", "content": prompt},
         ],
         response_format=HybridSearchQueries,
     )
-    return response.choices[0].message.parsed
+    result = response.choices[0].message.parsed
+    if return_trace:
+        trace = {
+            "system": system_text,
+            "user": prompt,
+            "response": result.model_dump(),
+        }
+        return result, trace
+    return result
 
 
 def retrieve_candidates(
@@ -106,7 +112,10 @@ def retrieve_candidates(
 
 
 def rerank_publishers(
-    service: StrategistService, manuscript: StrategistManuscript, candidates: list
+    service: StrategistService,
+    manuscript: StrategistManuscript,
+    candidates: list,
+    return_trace: bool = False,
 ) -> List[PublisherScore]:
     clean_candidates = []
     for match in candidates:
@@ -121,6 +130,10 @@ def rerank_publishers(
             }
         )
 
+    system_text = (
+        "You are a master publishing strategist. Identify the absolute best "
+        "fit for this specific manuscript."
+    )
     prompt = (
         "Evaluate the following list of publishers against the author's manuscript.\n\n"
         "MANUSCRIPT:\n"
@@ -136,19 +149,21 @@ def rerank_publishers(
     response = service.client.beta.chat.completions.parse(
         model=service.chat_model,
         messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a master publishing strategist. Identify the absolute best "
-                    "fit for this specific manuscript."
-                ),
-            },
+            {"role": "system", "content": system_text},
             {"role": "user", "content": prompt},
         ],
         response_format=RerankedList,
     )
 
-    return response.choices[0].message.parsed.scored_publishers
+    scored = response.choices[0].message.parsed.scored_publishers
+    if return_trace:
+        trace = {
+            "system": system_text,
+            "user": prompt,
+            "response": [s.model_dump() for s in scored],
+        }
+        return scored, trace
+    return scored
 
 
 def execute_strategist_pipeline(
