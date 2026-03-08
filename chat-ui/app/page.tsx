@@ -260,9 +260,9 @@ export default function SlushPilot() {
 
         {/* STEPS TRACE TAB */}
         {activeTab === 'trace' && (
-          <div className="flex-1 flex flex-col p-8 max-w-3xl mx-auto w-full relative">
+          <div className="flex-1 flex flex-col p-8 max-w-3xl mx-auto w-full relative overflow-hidden">
             <h2 className="text-3xl font-bold mb-8 underline decoration-binding-gold underline-offset-8">Iteration {iterationId} Trace</h2>
-            <div className="flex-1 overflow-y-auto space-y-6 pr-4 z-10">
+            <div className="flex-1 overflow-y-auto space-y-6 pr-4 z-10 min-h-0">
               {dbSteps.map((row, i) => (
                 <div key={i} className="space-y-4">
                   <div className="flex justify-end">
