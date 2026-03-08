@@ -74,10 +74,42 @@ EXAMPLE_PROMPT = (
 )
 
 EXAMPLE_RESPONSE = (
-    "Generated 5 personalized query letters for matching publishers. "
-    "Each letter includes an opening paragraph tailored to the publisher's catalog, "
-    "a story summary, author bio, and professional closing. "
-    "Publishers matched based on genre alignment and comparative title overlap."
+    "Generated 5 personalized query letters:\n\n"
+    "=== Query Letter for Algonquin Books ===\n\n"
+    "Dear Acquisitions Team,\n\n"
+    "Given Algonquin's celebrated tradition of publishing literary fiction that pairs "
+    "lyrical prose with quietly inventive premises — from Sara Novic's explorations of "
+    "identity to Jesmyn Ward's mythic Southern landscapes — I believe The Glass Garden "
+    "would resonate with your catalog.\n\n"
+    "THE GLASS GARDEN is an 80,000-word literary fiction novel set in 1920s England. "
+    "A reclusive botanist discovers that a high-frequency tone emitted by a New World "
+    "orchid opens brief windows into the past. As she journeys deeper into the greenhouse "
+    "passages, she must choose between rewriting her family's tragedy and preserving the "
+    "fragile timeline she already knows.\n\n"
+    "The novel will appeal to readers of Audrey Niffenegger's The Time Traveler's Wife "
+    "and Richard Powers's The Overstory — those drawn to stories where the natural world "
+    "intersects with the deeply personal.\n\n"
+    "Jane Smith holds an MFA in Creative Writing from the University of Iowa and has "
+    "published short fiction in The Paris Review and Tin House.\n\n"
+    "Thank you for your time and consideration. I would be happy to send the full "
+    "manuscript at your request.\n\n"
+    "Sincerely,\nJane Smith\n\n"
+    "=== Query Letter for Tin House Books ===\n\n"
+    "Dear Editors,\n\n"
+    "Tin House's commitment to bold, genre-bending literary fiction — exemplified by "
+    "titles that blend the speculative with the intimate — makes it an ideal home for "
+    "THE GLASS GARDEN, an 80,000-word novel in which a 1920s botanist discovers that a "
+    "rare orchid's resonance opens fleeting portals into the past.\n\n"
+    "As she traces the plant's colonial journey from South America to a crumbling English "
+    "estate, she uncovers secrets that could rewrite her family's tragedy — if she is "
+    "willing to risk the present.\n\n"
+    "Comparable to The Time Traveler's Wife in its emotional treatment of time and "
+    "The Overstory in its reverence for the botanical world, the novel offers a fresh "
+    "entry point into literary magical realism.\n\n"
+    "Jane Smith holds an MFA in Creative Writing from the University of Iowa and has "
+    "published short fiction in The Paris Review and Tin House.\n\n"
+    "Thank you for considering this project.\n\n"
+    "Warm regards,\nJane Smith"
 )
 
 EXAMPLE_STEPS = [
@@ -87,66 +119,185 @@ EXAMPLE_STEPS = [
             "system": "You extract structured fields for a query-letter assistant. "
             "Return JSON only that matches the schema. "
             "Use null for unknown values and do not invent details.",
-            "user": "Strategist fields: title, genre, word_count, blurb, "
-            "comparative_titles, target_audience. ..."
+            "user": (
+                "Strategist fields: title, genre, word_count, blurb, "
+                "comparative_titles, target_audience.\n"
+                "Composer fields: title, word_count, genre, summary, author_name, "
+                "detail_summary, author_bio, personalization_notes.\n"
+                "Always include strategist/composer objects with any extracted values.\n\n"
+                "User message:\n"
+                "Title: The Glass Garden\n"
+                "Genre: Literary Fiction\n"
+                "Word Count: 80000\n"
+                "Blurb: A reclusive botanist in 1920s England discovers that a high "
+                "frequency emitted by a New World orchid opens brief windows into the "
+                "past. As she journeys deeper into the greenhouse passages, she must "
+                "choose between rewriting her family's tragedy and preserving the "
+                "fragile timeline she already knows.\n"
+                "Comparative Titles: The Time Traveler's Wife, The Overstory\n"
+                "Target Audience: Adult literary fiction readers who enjoy magical "
+                "realism and historical settings\n"
+                "Author Name: Jane Smith\n"
+                "Author Bio: Jane Smith holds an MFA in Creative Writing from the "
+                "University of Iowa and has published short fiction in The Paris "
+                "Review and Tin House."
+            ),
         },
         "response": {
             "strategist": {
                 "title": "The Glass Garden",
                 "genre": "Literary Fiction",
                 "word_count": 80000,
-                "blurb": "A reclusive botanist discovers time travel through orchids...",
+                "blurb": "A reclusive botanist in 1920s England discovers that a high "
+                "frequency emitted by a New World orchid opens brief windows into the "
+                "past. As she journeys deeper into the greenhouse passages, she must "
+                "choose between rewriting her family's tragedy and preserving the "
+                "fragile timeline she already knows.",
                 "comparative_titles": ["The Time Traveler's Wife", "The Overstory"],
-                "target_audience": "Adult literary fiction readers"
+                "target_audience": "Adult literary fiction readers who enjoy magical "
+                "realism and historical settings",
             },
             "composer": {
                 "title": "The Glass Garden",
                 "word_count": 80000,
                 "genre": "Literary Fiction",
-                "summary": "A reclusive botanist discovers time travel through orchids...",
+                "summary": "A reclusive botanist in 1920s England discovers that a high "
+                "frequency emitted by a New World orchid opens brief windows into the "
+                "past. As she journeys deeper into the greenhouse passages, she must "
+                "choose between rewriting her family's tragedy and preserving the "
+                "fragile timeline she already knows.",
                 "author_name": "Jane Smith",
-                "author_bio": "Jane Smith holds an MFA from Iowa..."
-            }
-        }
+                "author_bio": "Jane Smith holds an MFA in Creative Writing from the "
+                "University of Iowa and has published short fiction in The Paris "
+                "Review and Tin House.",
+            },
+        },
     },
     {
         "module": "Strategist - Query Formulation",
         "prompt": {
             "system": "You are an expert literary agent AI configuring a database search.",
-            "user": "Analyze this manuscript profile and generate search queries..."
+            "user": (
+                "Analyze this manuscript profile and generate search queries for our "
+                "publisher database.\n"
+                "Genre: Literary Fiction | Word Count: 80000\n"
+                "Comps: The Time Traveler's Wife, The Overstory\n"
+                "Blurb: A reclusive botanist in 1920s England discovers that a high "
+                "frequency emitted by a New World orchid opens brief windows into the "
+                "past. As she journeys deeper into the greenhouse passages, she must "
+                "choose between rewriting her family's tragedy and preserving the "
+                "fragile timeline she already knows."
+            ),
         },
         "response": {
-            "semantic_query": "Literary fiction novel with magical realism elements...",
-            "lexical_keywords": ["literary fiction", "magical realism", "time travel",
-                                 "botanical", "historical"]
-        }
+            "semantic_query": "Literary fiction novel set in 1920s England following a "
+            "reclusive botanist who discovers a rare orchid that opens windows into the "
+            "past, blending lyrical prose with soft speculative time-slip elements, "
+            "exploring memory, grief, and the entangled histories of people and plants "
+            "in the spirit of The Time Traveler's Wife and The Overstory",
+            "lexical_keywords": [
+                "literary fiction",
+                "magical realism",
+                "time-slip",
+                "botanical",
+                "historical fiction",
+                "1920s England",
+            ],
+        },
     },
     {
         "module": "Strategist - Reranking",
         "prompt": {
             "system": "You are a master publishing strategist. Identify the absolute "
             "best fit for this specific manuscript.",
-            "user": "Evaluate the following list of publishers against the manuscript..."
+            "user": (
+                "Evaluate the following list of publishers against the author's manuscript.\n\n"
+                "MANUSCRIPT:\n"
+                "Genre: Literary Fiction\n"
+                "Comps: The Time Traveler's Wife, The Overstory\n"
+                "Blurb: A reclusive botanist in 1920s England discovers that a high "
+                "frequency emitted by a New World orchid opens brief windows into the past.\n\n"
+                "RETRIEVED PUBLISHERS:\n"
+                '[{"publisher_id": "pub_001", "name": "Algonquin Books", '
+                '"active_genres": "Literary Fiction, Historical Fiction", '
+                '"recent_comp_titles": "Sara Novic, Jesmyn Ward"}, '
+                '{"publisher_id": "pub_002", "name": "Tin House Books", '
+                '"active_genres": "Literary Fiction, Speculative Fiction", '
+                '"recent_comp_titles": "Kelly Link, Carmen Maria Machado"}]\n\n'
+                "Score each publisher from 1 to 10 based strictly on how well their "
+                "genres and recent comp titles align with the manuscript."
+            ),
         },
         "response": {
-            "top_publishers": [
-                {"name": "Algonquin Books", "score": 9, "reasoning": "Strong literary fiction catalog"},
-                {"name": "Tin House Books", "score": 8, "reasoning": "Publishes magical realism"}
+            "scored_publishers": [
+                {
+                    "publisher_id": "pub_001",
+                    "publisher_name": "Algonquin Books",
+                    "score": 9,
+                    "reasoning": "Strong literary fiction catalog with lyrical, character-driven novels",
+                    "comps": ["Sara Novic", "Jesmyn Ward"],
+                },
+                {
+                    "publisher_id": "pub_002",
+                    "publisher_name": "Tin House Books",
+                    "score": 8,
+                    "reasoning": "Publishes genre-bending literary fiction including magical realism",
+                    "comps": ["Kelly Link", "Carmen Maria Machado"],
+                },
             ]
-        }
+        },
     },
     {
         "module": "Composer",
         "prompt": {
-            "system": "You are a query letter composer. Return JSON only.",
-            "user": "Generate personalized query letters for each publisher..."
+            "system": "You are a query letter composer. Write personalized query letters "
+            "for each publisher based on their catalog and the manuscript details. "
+            "Return JSON only.",
+            "user": (
+                "Manuscript: The Glass Garden by Jane Smith, 80,000-word literary fiction. "
+                "A reclusive botanist in 1920s England discovers that a rare orchid opens "
+                "windows into the past.\n"
+                "Comps: The Time Traveler's Wife, The Overstory\n"
+                "Author Bio: Jane Smith holds an MFA in Creative Writing from the "
+                "University of Iowa and has published short fiction in The Paris Review "
+                "and Tin House.\n\n"
+                "Publishers:\n"
+                "1. Algonquin Books (comps: Sara Novic, Jesmyn Ward)\n"
+                "2. Tin House Books (comps: Kelly Link, Carmen Maria Machado)\n\n"
+                "Generate a personalized query letter for each publisher."
+            ),
         },
         "response": {
-            "letters_generated": 5,
-            "sample_opening": "Dear Acquisitions Team, Given your catalog's emphasis on "
-            "literary fiction with inventive premises..."
-        }
-    }
+            "letters": [
+                {
+                    "publisher": "Algonquin Books",
+                    "status": "ok",
+                    "letter": "Dear Acquisitions Team,\n\nGiven Algonquin's celebrated "
+                    "tradition of publishing literary fiction that pairs lyrical prose "
+                    "with quietly inventive premises, I believe The Glass Garden would "
+                    "resonate with your catalog.\n\nTHE GLASS GARDEN is an 80,000-word "
+                    "literary fiction novel set in 1920s England. A reclusive botanist "
+                    "discovers that a rare orchid opens brief windows into the past. As "
+                    "she journeys deeper into the greenhouse passages, she must choose "
+                    "between rewriting her family's tragedy and preserving the fragile "
+                    "timeline she already knows.\n\nThe novel will appeal to readers of "
+                    "The Time Traveler's Wife and The Overstory.\n\nJane Smith holds an "
+                    "MFA in Creative Writing from the University of Iowa and has published "
+                    "short fiction in The Paris Review and Tin House.\n\nThank you for your "
+                    "time and consideration.\n\nSincerely,\nJane Smith",
+                },
+                {
+                    "publisher": "Tin House Books",
+                    "status": "ok",
+                    "letter": "Dear Editors,\n\nTin House's commitment to bold, "
+                    "genre-bending literary fiction makes it an ideal home for THE GLASS "
+                    "GARDEN, an 80,000-word novel in which a 1920s botanist discovers "
+                    "that a rare orchid's resonance opens fleeting portals into the "
+                    "past.\n\nWarm regards,\nJane Smith",
+                },
+            ]
+        },
+    },
 ]
 
 
@@ -182,7 +333,7 @@ async def get_agent_info():
 
 @router.get("/api/model_architecture")
 async def get_model_architecture():
-    return FileResponse(config.ARCHITECTURE_IMAGE, media_type="image/jpeg")
+    return FileResponse(config.ARCHITECTURE_IMAGE, media_type="image/png")
 
 
 def _sanitize_for_pg(obj):

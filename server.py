@@ -72,7 +72,7 @@ async def get_agent_info():
 @app.get("/api/model_architecture")
 async def get_model_architecture():
     """Returns the architecture diagram PNG."""
-    return FileResponse(config.ARCHITECTURE_IMAGE, media_type="image/jpeg")
+    return FileResponse(config.ARCHITECTURE_IMAGE, media_type="image/png")
 
 
 @app.post("/api/execute", response_model=ExecuteResponse)
