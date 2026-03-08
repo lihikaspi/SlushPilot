@@ -152,6 +152,19 @@ export default function SlushPilot() {
     }
   };
 
+  // Format the execute response for the main tab display
+  const formatResponse = (response: string) => {
+    if (!response) return response;
+    // Extract publisher names from "=== Query Letter for <publisher> ===" patterns
+    const matches = [...response.matchAll(/=== Query Letter for (.+?) ===/g)];
+    if (matches.length > 0) {
+      const names = matches.map(m => m[1]);
+      return `I found you some publishers: ${names.join(', ')}. The query letters can be viewed in the Letters tab.`;
+    }
+    // If it's an error or non-standard response, show as-is
+    return response;
+  };
+
   // Helper to strip outermost {} or [] from JSON for raw display
   const formatJsonRaw = (val: any) => {
     if (!val) return "No trace data available.";
@@ -163,9 +176,12 @@ export default function SlushPilot() {
     <div className="flex h-screen bg-parchment text-ink">
       {/* Sidebar */}
       <aside className="w-64 border-r border-binding-gold flex flex-col p-6 bg-parchment">
-        <div className="mb-10">
+        <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tighter uppercase border-b-2 border-ink pb-2">Slush Pilot</h1>
         </div>
+        <button onClick={handleNewConversation} className="mb-6 w-full border border-binding-gold px-4 py-2 hover:bg-binding-gold transition-colors uppercase text-xs font-bold tracking-widest cursor-pointer">
+          New Conversation
+        </button>
         <nav className="space-y-4 flex-1">
           <NavBtn icon={<MessageSquare size={18}/>} label="Run Agent" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
           <NavBtn icon={<User size={18}/>} label="Personal Info" active={activeTab === 'info'} onClick={() => setActiveTab('info')} />
@@ -173,13 +189,10 @@ export default function SlushPilot() {
           <NavBtn icon={<ScrollText size={18}/>} label="Letters" active={activeTab === 'letters'} onClick={() => setActiveTab('letters')} />
         </nav>
         {iterationId !== null && (
-          <p className="text-[10px] uppercase tracking-widest text-manuscript-gray mb-2 text-center">
+          <p className="text-[10px] uppercase tracking-widest text-manuscript-gray text-center">
             Iteration #{iterationId}
           </p>
         )}
-        <button onClick={handleNewConversation} className="mt-2 border border-binding-gold px-4 py-2 hover:bg-binding-gold transition-colors uppercase text-xs font-bold tracking-widest cursor-pointer">
-          New Conversation
-        </button>
       </aside>
 
       <main className="flex-1 overflow-hidden flex flex-col relative">
@@ -204,7 +217,7 @@ export default function SlushPilot() {
                   {row.response && (
                     <div className="flex justify-start">
                       <div className="max-w-[80%] p-4 rounded shadow-sm border bg-white border-binding-gold">
-                        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{row.response}</pre>
+                        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{formatResponse(row.response)}</pre>
                       </div>
                     </div>
                   )}
