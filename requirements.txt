@@ -3,6 +3,7 @@ python-dotenv
 uvicorn
 fastapi
 pinecone
+pinecone-text
 pydantic
 langchain
 langchain-openai
@@ -11,3 +12,4 @@ langchain-community
 langchain-core
 langchain-text-splitters
 langchain-classic
+langgraph

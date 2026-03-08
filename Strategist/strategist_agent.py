@@ -1,3 +1,36 @@
+from pathlib import Path
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
+
+from app.agents.strategist import (  # noqa: E402
+    StrategistManuscript,
+    create_strategist_service,
+    execute_strategist_pipeline,
+)
+
+
+if __name__ == "__main__":
+    my_book = StrategistManuscript(
+        title="Memory Broker",
+        genre="Sci-Fi Thriller",
+        word_count=85000,
+        blurb=(
+            "In a future where memories can be extracted and sold, a black-market "
+            "memory broker discovers a sequence that proves the ruling corporation "
+            "engineered the collapse of Earth's atmosphere."
+        ),
+        comparative_titles=[
+            "Dark Matter by Blake Crouch",
+            "Altered Carbon by Richard K. Morgan",
+        ],
+        target_audience="Adults who enjoy fast-paced, dystopian corporate espionage.",
+    )
+
+    service = create_strategist_service()
+    execute_strategist_pipeline(service, my_book)
 import os
 import json
 from typing import List
