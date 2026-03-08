@@ -17,6 +17,7 @@ FIELD_HINTS = {
     "composer.genre": "the genre",
     "composer.summary": "a fuller summary of the story",
     "composer.author_name": "the author name",
+    "composer.author_bio": "a brief author bio for the query letter (1–3 sentences). If you have writing credentials, mention them — publications, awards, an MFA, or selection for a prestigious conference or residency. If you don't have formal credentials, that's completely fine — just share what makes you the right person to tell this story (personal connection, professional expertise, life experience, etc.)",
 }
 
 

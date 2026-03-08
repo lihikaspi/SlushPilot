@@ -41,6 +41,7 @@ class QueryLetterState(TypedDict, total=False):
     next_step: str
     await_confirmation: bool
     publisher_confirmation: Optional[bool]
+    bio_clarified: bool
 
 
 def _missing_strategist_fields(strategist_data: Dict[str, Any]) -> List[str]:
@@ -77,7 +78,7 @@ def _missing_strategist_fields(strategist_data: Dict[str, Any]) -> List[str]:
     return missing
 
 
-def _missing_composer_fields(composer_data: Dict[str, Any]) -> List[str]:
+def _missing_composer_fields(composer_data: Dict[str, Any], bio_clarified: bool = False) -> List[str]:
     if not composer_data:
         return [
             "composer.title",
@@ -85,6 +86,7 @@ def _missing_composer_fields(composer_data: Dict[str, Any]) -> List[str]:
             "composer.genre",
             "composer.summary",
             "composer.author_name",
+            "composer.author_bio",
         ]
 
     missing = []
@@ -104,6 +106,13 @@ def _missing_composer_fields(composer_data: Dict[str, Any]) -> List[str]:
         missing.append("composer.summary")
     if not author_name:
         missing.append("composer.author_name")
+
+    # Check bio quality — only ask once. If we already asked, accept whatever
+    # the user gave (they may not have formal credentials).
+    author_bio = (composer_data.get("author_bio") or "").strip()
+    if not bio_clarified and (not author_bio or len(author_bio) < 30):
+        missing.append("composer.author_bio")
+
     return missing
 
 
@@ -136,50 +145,81 @@ def _supervisor_node(state: QueryLetterState) -> dict:
     if state.get("user_message"):
         return {"next_step": "intake"}
 
-    strategist_data = state.get("strategist_data") or {}
-    composer_data = state.get("composer_data") or {}
+    strategist_data = dict(state.get("strategist_data") or {})
+    composer_data = dict(state.get("composer_data") or {})
+
+    # Cross-populate overlapping fields between strategist and composer
+    if not strategist_data.get("blurb") and composer_data.get("summary"):
+        strategist_data["blurb"] = composer_data["summary"]
+    if not composer_data.get("summary") and strategist_data.get("blurb"):
+        composer_data["summary"] = strategist_data["blurb"]
 
     if os.getenv("DEBUG_INTAKE") == "1":
         print("Supervisor strategist_data:", strategist_data)
         print("Supervisor composer_data:", composer_data)
+
+    # Base return always includes cross-populated data
+    base = {"strategist_data": strategist_data, "composer_data": composer_data}
 
     missing_fields = _missing_strategist_fields(strategist_data)
     if os.getenv("DEBUG_INTAKE") == "1":
         print("Supervisor missing strategist fields:", missing_fields)
     if missing_fields:
         return {
+            **base,
             "missing_fields": missing_fields,
             "next_step": "clarify",
         }
 
     if not state.get("publishers"):
         return {
+            **base,
             "missing_fields": [],
             "next_step": "strategist",
         }
 
     if state.get("await_confirmation") and state.get("publisher_confirmation") is None:
-        return {"next_step": "end"}
+        return {**base, "next_step": "end"}
 
     if state.get("publisher_confirmation") is False:
-        return {"next_step": "end"}
+        return {**base, "next_step": "end"}
 
-    missing_fields = _missing_composer_fields(composer_data)
+    bio_clarified = state.get("bio_clarified", False)
+    missing_fields = _missing_composer_fields(composer_data, bio_clarified=bio_clarified)
     if os.getenv("DEBUG_INTAKE") == "1":
         print("Supervisor missing composer fields:", missing_fields)
     if missing_fields:
+        # If bio is among the missing fields, mark it as clarified so we
+        # don't ask again (the user may not have formal credentials).
+        bio_flag = "composer.author_bio" in missing_fields
         return {
+            **base,
             "missing_fields": missing_fields,
             "next_step": "clarify",
+            "bio_clarified": bio_clarified or bio_flag,
         }
 
-    if not state.get("letters"):
+    # Check if letters exist and at least one succeeded
+    letters_obj = state.get("letters")
+    has_good_letters = False
+    if letters_obj and hasattr(letters_obj, "letters"):
+        has_good_letters = any(lr.status == "ok" and lr.letter for lr in letters_obj.letters)
+    elif isinstance(letters_obj, dict) and letters_obj.get("letters"):
+        has_good_letters = any(
+            lr.get("status") == "ok" and lr.get("letter")
+            for lr in letters_obj["letters"]
+        )
+
+    if not has_good_letters:
+        # Clear failed letters so composer can retry
         return {
+            **base,
             "missing_fields": [],
             "next_step": "composer",
+            "letters": None,
         }
 
-    return {"missing_fields": [], "next_step": "end"}
+    return {**base, "missing_fields": [], "next_step": "end"}
 
 
 def _strategist_node(state: QueryLetterState) -> dict:
