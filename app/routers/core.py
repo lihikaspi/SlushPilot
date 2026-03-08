@@ -182,7 +182,7 @@ async def get_agent_info():
 
 @router.get("/api/model_architecture")
 async def get_model_architecture():
-    return FileResponse(config.ARCHITECTURE_IMAGE, media_type="image/png")
+    return FileResponse(config.ARCHITECTURE_IMAGE, media_type="image/jpeg")
 
 
 def _sanitize_for_pg(obj):

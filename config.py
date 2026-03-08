@@ -14,7 +14,7 @@ EMBED_MODEL = "RPRTHPB-text-embedding-3-small"
 PINECONE_INDEX = "slushpilot-publishers"
 STRATEGIST_BM25_PATH = "Strategist/bm25_publisher_weights.json"
 
-ARCHITECTURE_IMAGE = "images/SlushPilot.png"
+ARCHITECTURE_IMAGE = "images/SlushPIlot.jpg"
 
 PROJECT_STATUS = {
     "new": {"label": "New Project", "color": "gray"},
