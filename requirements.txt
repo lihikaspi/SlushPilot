@@ -12,3 +12,4 @@ langchain-community
 langchain-core
 langchain-text-splitters
 langchain-classic
+langgraph

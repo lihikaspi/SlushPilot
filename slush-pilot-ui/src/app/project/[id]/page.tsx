@@ -35,6 +35,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [selectedLetter, setSelectedLetter] = useState<QueryLetter | null>(null);
   const [loading, setLoading] = useState(true);
   const [inputValue, setInputValue] = useState('');
+  const [isAiThinking, setIsAiThinking] = useState(false);
 
   const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
   const [renameValue, setRenameValue] = useState('');
@@ -138,10 +139,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   }, [id]);
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !project) return;
+    if (!inputValue.trim() || !project || isAiThinking) return;
     const now = new Date().toISOString();
     const nextId = messages.length > 0 ? Math.max(...messages.map(m => m.chat_message_id)) + 1 : 0;
 
+    // 1. Save user message to Supabase
     const { data, error } = await supabase
       .from('messages')
       .insert({
@@ -154,18 +156,92 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       .select()
       .single();
 
-    if (data && !error) {
-      const updatedMessages = [...messages, data];
-      setMessages(updatedMessages);
-      setInputValue('');
+    if (!data || error) return;
 
-      let nextStatus = project.current_stage;
-      if (queryLetters.length === 0 && updatedMessages.length > 1) {
-        nextStatus = 'publisher_search';
+    const userMessage = inputValue.trim();
+    setMessages(prev => [...prev, data]);
+    setInputValue('');
+    setIsAiThinking(true);
+
+    try {
+      // 2. Call the backend chat endpoint
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: id,
+          user_message: userMessage,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backend error: ${response.status}`);
       }
 
-      await supabase.from('projects').update({ current_stage: nextStatus, updated_at: now }).eq('id', id);
-      setProject({ ...project, current_stage: nextStatus, updated_at: now });
+      const result = await response.json();
+
+      // 3. Save assistant response to Supabase
+      if (result.assistant_message) {
+        const aiMessageId = nextId + 1;
+        const { data: aiData } = await supabase
+          .from('messages')
+          .insert({
+            project_id: id,
+            user_id: project.user_id,
+            role: 'model',
+            content: result.assistant_message,
+            chat_message_id: aiMessageId,
+          })
+          .select()
+          .single();
+
+        if (aiData) {
+          setMessages(prev => [...prev, aiData]);
+        }
+      }
+
+      // 4. If letters were saved, refresh letters and update project stage
+      if (result.letters_saved && result.letters_saved.length > 0) {
+        const { data: lettersData } = await supabase
+          .from('query_letters')
+          .select('id, publisher, content, updated_at')
+          .eq('project_id', id)
+          .order('updated_at', { ascending: false });
+
+        if (lettersData) {
+          setQueryLetters(lettersData);
+          if (lettersData.length > 0) setSelectedLetter(lettersData[0]);
+        }
+
+        await supabase.from('projects')
+          .update({ current_stage: 'drafting', updated_at: now })
+          .eq('id', id);
+        setProject((prev: any) => ({ ...prev, current_stage: 'drafting' }));
+      } else {
+        const nextStatus = 'publisher_search';
+        await supabase.from('projects')
+          .update({ current_stage: nextStatus, updated_at: now })
+          .eq('id', id);
+        setProject((prev: any) => ({ ...prev, current_stage: nextStatus }));
+      }
+    } catch (err) {
+      console.error('Chat error:', err);
+      const errorId = nextId + 1;
+      const { data: errData } = await supabase
+        .from('messages')
+        .insert({
+          project_id: id,
+          user_id: project.user_id,
+          role: 'model',
+          content: "I'm sorry, something went wrong. Please try again.",
+          chat_message_id: errorId,
+        })
+        .select()
+        .single();
+      if (errData) setMessages(prev => [...prev, errData]);
+    } finally {
+      setIsAiThinking(false);
     }
   };
 
@@ -257,10 +333,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     </div>
                   );
                 })}
+                {isAiThinking && (
+                  <div className="flex justify-start mt-6">
+                    <div className="max-w-[75%] p-5 rounded-2xl bg-[#f4f1ea] border border-[#dcd6bc] text-[#444] rounded-tl-none">
+                      <span className="italic text-sm font-sans animate-pulse">Thinking...</span>
+                    </div>
+                  </div>
+                )}
             </div>
             <div className="bg-white border border-[#dcd6bc] p-4 flex items-center space-x-4 shadow-lg shrink-0">
               <textarea className="flex-1 bg-transparent outline-none resize-none font-sans text-sm py-2 h-12" placeholder="Ask SlushPilot" rows={1} value={inputValue} onChange={(e) => setInputValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && inputValue.trim()) { e.preventDefault(); handleSendMessage(); } }} />
-              <button onClick={handleSendMessage} disabled={!inputValue.trim()} className={`text-black p-3 hover:bg-black/5 shrink-0 flex items-center justify-center transition-all ${!inputValue.trim() ? 'opacity-20 cursor-default' : 'cursor-pointer'}`}>
+              <button onClick={handleSendMessage} disabled={!inputValue.trim() || isAiThinking} className={`text-black p-3 hover:bg-black/5 shrink-0 flex items-center justify-center transition-all ${!inputValue.trim() || isAiThinking ? 'opacity-20 cursor-default' : 'cursor-pointer'}`}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 12 2 21 5 12 2 3 22 12" /><line x1="5" y1="12" x2="22" y2="12" /></svg>
               </button>
             </div>
