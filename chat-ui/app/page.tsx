@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { User, MessageSquare, History, ScrollText, Loader2, Save } from 'lucide-react';
+import { User, MessageSquare, History, ScrollText, Loader2, Save, ChevronDown } from 'lucide-react';
 
 // Supabase Configuration
 const supabase = createClient(
@@ -19,6 +19,9 @@ export default function SlushPilot() {
   const [input, setInput] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<any>(null);
   const [iterationId, setIterationId] = useState<number | null>(null);
+  const [latestIterationId, setLatestIterationId] = useState<number | null>(null);
+  const [allIterations, setAllIterations] = useState<{id: number, created_at: string}[]>([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // States aligned with DB schemas
   const [userInfo, setUserInfo] = useState({
@@ -59,16 +62,16 @@ export default function SlushPilot() {
         .single();
       if (user) setUserInfo(user);
 
-      // Fetch latest iteration for this user
+      // Fetch all iterations for this user
       const { data: iterations } = await supabase
         .from('iterations')
         .select('*')
         .eq('user', USER_ID)
-        .order('id', { ascending: false })
-        .limit(1);
+        .order('id', { ascending: false });
 
       let currentIteration: number;
       if (iterations && iterations.length > 0) {
+        setAllIterations(iterations);
         currentIteration = iterations[0].id;
       } else {
         // No iterations exist — create the first one
@@ -79,9 +82,11 @@ export default function SlushPilot() {
         });
         const result = await res.json();
         currentIteration = result.iteration_id;
+        setAllIterations([{ id: currentIteration, created_at: new Date().toISOString() }]);
       }
 
       setIterationId(currentIteration);
+      setLatestIterationId(currentIteration);
       await fetchIterationData(currentIteration);
     } catch (err) {
       console.error("Fetch error:", err);
@@ -113,7 +118,10 @@ export default function SlushPilot() {
         body: JSON.stringify({ user_id: USER_ID }),
       });
       const result = await res.json();
-      setIterationId(result.iteration_id);
+      const newId = result.iteration_id;
+      setIterationId(newId);
+      setLatestIterationId(newId);
+      setAllIterations(prev => [{ id: newId, created_at: new Date().toISOString() }, ...prev]);
       setDbSteps([]);
       setLetters([]);
       setSelectedLetter(null);
@@ -179,20 +187,55 @@ export default function SlushPilot() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold tracking-tighter uppercase border-b-2 border-ink pb-2">Slush Pilot</h1>
         </div>
-        <button onClick={handleNewConversation} className="mb-6 w-full border border-binding-gold px-4 py-2 hover:bg-binding-gold transition-colors uppercase text-xs font-bold tracking-widest cursor-pointer">
+        <button onClick={handleNewConversation} className="mb-4 w-full border border-binding-gold px-4 py-2 hover:bg-binding-gold transition-colors uppercase text-xs font-bold tracking-widest cursor-pointer">
           New Conversation
         </button>
+        {/* Conversation switcher */}
+        <div className="relative mb-6">
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="w-full flex items-center justify-between px-4 py-2 border border-binding-gold hover:bg-binding-gold/30 transition-colors cursor-pointer"
+          >
+            <span className="uppercase text-xs font-bold tracking-widest">
+              Conversation {iterationId}
+            </span>
+            <ChevronDown size={14} className={`transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {dropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setDropdownOpen(false)} />
+              <div className="absolute left-0 right-0 top-full mt-1 bg-parchment border border-binding-gold shadow-lg z-20 max-h-48 overflow-y-auto">
+                {allIterations.map((iter) => (
+                  <button
+                    key={iter.id}
+                    onClick={async () => {
+                      setIterationId(iter.id);
+                      setSelectedLetter(null);
+                      setDropdownOpen(false);
+                      await fetchIterationData(iter.id);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-xs uppercase tracking-widest cursor-pointer transition-colors ${
+                      iter.id === iterationId
+                        ? 'bg-binding-gold font-bold'
+                        : 'hover:bg-binding-gold/30'
+                    }`}
+                  >
+                    Conversation {iter.id}
+                    {iter.id === latestIterationId && (
+                      <span className="ml-2 text-manuscript-gray">(current)</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
         <nav className="space-y-4 flex-1">
           <NavBtn icon={<MessageSquare size={18}/>} label="Run Agent" active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} />
           <NavBtn icon={<User size={18}/>} label="Personal Info" active={activeTab === 'info'} onClick={() => setActiveTab('info')} />
           <NavBtn icon={<History size={18}/>} label="Steps Trace" active={activeTab === 'trace'} onClick={() => setActiveTab('trace')} />
           <NavBtn icon={<ScrollText size={18}/>} label="Letters" active={activeTab === 'letters'} onClick={() => setActiveTab('letters')} />
         </nav>
-        {iterationId !== null && (
-          <p className="text-[10px] uppercase tracking-widest text-manuscript-gray text-center">
-            Iteration #{iterationId}
-          </p>
-        )}
       </aside>
 
       <main className="flex-1 overflow-hidden flex flex-col relative">
@@ -225,18 +268,24 @@ export default function SlushPilot() {
               ))}
               {loading && <Loader2 className="animate-spin text-manuscript-gray mx-auto" />}
             </div>
-            <div className="mt-6 flex gap-3 bg-white p-2 border border-binding-gold shadow-inner z-10">
-              <input
-                className="flex-1 bg-transparent outline-none px-2 py-2 font-sans"
-                placeholder="Describe your manuscript..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleRunAgent()}
-              />
-              <button onClick={handleRunAgent} className="bg-binding-gold text-ink px-4 py-2 hover:bg-ink hover:text-parchment border border-ink uppercase text-xs font-bold tracking-widest cursor-pointer">
-                Run Agent
-              </button>
-            </div>
+            {iterationId !== latestIterationId ? (
+              <div className="mt-6 flex items-center justify-center bg-white/50 p-3 border border-binding-gold text-manuscript-gray z-10">
+                <p className="text-xs uppercase tracking-widest">Viewing past conversation</p>
+              </div>
+            ) : (
+              <div className="mt-6 flex gap-3 bg-white p-2 border border-binding-gold shadow-inner z-10">
+                <input
+                  className="flex-1 bg-transparent outline-none px-2 py-2 font-sans"
+                  placeholder="Describe your manuscript..."
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleRunAgent()}
+                />
+                <button onClick={handleRunAgent} className="bg-binding-gold text-ink px-4 py-2 hover:bg-ink hover:text-parchment border border-ink uppercase text-xs font-bold tracking-widest cursor-pointer">
+                  Run Agent
+                </button>
+              </div>
+            )}
           </div>
         )}
 
